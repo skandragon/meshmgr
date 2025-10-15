@@ -1,0 +1,37 @@
+header:
+  license:
+    spdx-id: AGPL-3.0-only
+    copyright-owner: Michael Graff
+    copyright-year: 2025
+
+  paths-ignore:
+    - 'bin'
+    - 'buildtime'
+    - '**/*.md'
+    - 'NOTICE'
+    - 'LICENSE'
+    - .gitignore
+    - .dockerignore
+    - .github
+    - .licenserc.yaml
+    - '**/*.yaml'
+    - '**/*.yml'
+    - '**/*.json'
+    - '**/*.mermaid'
+    - '**/*.svg'
+    - go.sum
+    - go.mod
+    - go.work
+    - go.work.sum
+    - '**/testdata/**'
+    - .idea
+    - '**/*.sql.go'
+    - '**/*.sql'
+    - '**/*db/batch.go'
+    - '**/*db/db.go'
+    - '**/*db/models.go'
+    - '**/*db/querier.go'
+    - '**/*db/copyfrom.go'
+    - '**/*.pb.go'
+
+  comment: on-failure

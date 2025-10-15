@@ -1,0 +1,93 @@
+version: 2
+
+project_name: meshmgr
+
+before:
+  hooks:
+    - go mod tidy
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  disable: true
+
+changelog:
+  disable: true
+
+archives:
+  - id: default
+    # use the "binary" format so GoReleaser skips creating an archive
+    formats:
+      - binary
+
+builds:
+  - id: meshmgr
+    main: ./main.go
+    binary: meshmgr
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/skandragon/meshmgr/cmd.Version={{.Version}}
+      - -X github.com/skandragon/meshmgr/cmd.Commit={{.Commit}}
+      - -X github.com/skandragon/meshmgr/cmd.Date={{.Date}}
+
+dockers:
+  - goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
+    use: buildx
+    ids:
+      - meshmgr
+      - lakectl
+    image_templates:
+      - "docker.flame.org/library/meshmgr:{{ .Tag }}-amd64"
+    build_flag_templates:
+      - --pull
+      - --no-cache
+      - --platform=linux/amd64
+      - --build-arg=TARGETARCH=amd64
+      - --build-arg=DUCKDB_VERSION=v1.3.2
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.name={{.ProjectName}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.source={{.GitURL}}
+    extra_files:
+      - docker/duckdb-extensions
+  - goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile
+    use: buildx
+    ids:
+      - meshmgr
+      - lakectl
+    image_templates:
+      - "docker.flame.org/library/meshmgr:{{ .Tag }}-arm64"
+    build_flag_templates:
+      - --pull
+      - --no-cache
+      - --platform=linux/arm64
+      - --build-arg=TARGETARCH=arm64
+      - --build-arg=DUCKDB_VERSION=v1.3.2
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.name={{.ProjectName}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}
+      - --label=org.opencontainers.image.source={{.GitURL}}
+    extra_files:
+      - docker/duckdb-extensions
+
+docker_manifests:
+  - name_template: "docker.flame.org/library/meshmgr:{{ .Tag }}"
+    image_templates:
+      - "docker.flame.org/library/meshmgr:{{ .Tag }}-amd64"
+      - "docker.flame.org/library/meshmgr:{{ .Tag }}-arm64"
