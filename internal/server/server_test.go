@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/orlangure/gnomock"
 	"github.com/orlangure/gnomock/preset/postgres"
@@ -101,6 +102,7 @@ func setupTestServer(t *testing.T) *testServer {
 	srv := &Server{
 		config: cfg,
 		db:     pool,
+		router: chi.NewRouter(),
 	}
 	srv.setupMiddleware()
 	srv.setupRoutes()
