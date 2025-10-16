@@ -99,6 +99,16 @@ func (s *Server) handleGetMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if user has at least viewer access
+	if _, err := s.requireMeshAccess(r.Context(), user.ID, meshID, AccessLevelViewer); err != nil {
+		if err == pgx.ErrNoRows {
+			writeError(w, http.StatusNotFound, "Mesh not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to check permissions")
+		return
+	}
+
 	mesh, err := s.DB().GetMeshByID(r.Context(), meshID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -133,20 +143,13 @@ func (s *Server) handleUpdateMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get existing mesh to check ownership
-	mesh, err := s.DB().GetMeshByID(r.Context(), meshID)
-	if err != nil {
+	// Check if user has at least admin access
+	if _, err := s.requireMeshAccess(r.Context(), user.ID, meshID, AccessLevelAdmin); err != nil {
 		if err == pgx.ErrNoRows {
 			writeError(w, http.StatusNotFound, "Mesh not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "Failed to get mesh")
-		return
-	}
-
-	// Check if user owns the mesh (basic check - will need mesh_access later)
-	if mesh.OwnerID != user.ID {
-		writeError(w, http.StatusForbidden, "You don't have permission to update this mesh")
+		writeError(w, http.StatusInternalServerError, "Failed to check permissions")
 		return
 	}
 
@@ -180,20 +183,13 @@ func (s *Server) handleDeleteMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get existing mesh to check ownership
-	mesh, err := s.DB().GetMeshByID(r.Context(), meshID)
-	if err != nil {
+	// Check if user is the mesh owner
+	if _, err := s.requireMeshAccess(r.Context(), user.ID, meshID, AccessLevelOwner); err != nil {
 		if err == pgx.ErrNoRows {
 			writeError(w, http.StatusNotFound, "Mesh not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "Failed to get mesh")
-		return
-	}
-
-	// Check if user owns the mesh (basic check - will need mesh_access later)
-	if mesh.OwnerID != user.ID {
-		writeError(w, http.StatusForbidden, "You don't have permission to delete this mesh")
+		writeError(w, http.StatusInternalServerError, "Failed to check permissions")
 		return
 	}
 

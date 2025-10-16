@@ -188,8 +188,8 @@ RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_k
 `
 
 type UpdateNodeParams struct {
-	Name       string     `json:"name"`
-	LongName   string     `json:"long_name"`
+	Name       *string    `json:"name"`
+	LongName   *string    `json:"long_name"`
 	Role       *string    `json:"role"`
 	PublicKey  *string    `json:"public_key"`
 	PrivateKey *string    `json:"private_key"`

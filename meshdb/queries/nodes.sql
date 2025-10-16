@@ -19,13 +19,13 @@ ORDER BY name ASC;
 -- name: UpdateNode :one
 UPDATE nodes
 SET
-    name = COALESCE(@name, name),
-    long_name = COALESCE(@long_name, long_name),
-    role = COALESCE(@role, role),
-    public_key = COALESCE(@public_key, public_key),
-    private_key = COALESCE(@private_key, private_key),
-    status = COALESCE(@status, status),
-    last_seen = COALESCE(@last_seen, last_seen),
+    name = COALESCE(sqlc.narg('name'), name),
+    long_name = COALESCE(sqlc.narg('long_name'), long_name),
+    role = COALESCE(sqlc.narg('role'), role),
+    public_key = COALESCE(sqlc.narg('public_key'), public_key),
+    private_key = COALESCE(sqlc.narg('private_key'), private_key),
+    status = COALESCE(sqlc.narg('status'), status),
+    last_seen = COALESCE(sqlc.narg('last_seen'), last_seen),
     updated_at = NOW()
 WHERE id = @id
 RETURNING *;

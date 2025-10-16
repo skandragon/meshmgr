@@ -74,6 +74,26 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("GET /api/meshes/{meshID}", s.withAuth(s.handleGetMesh))
 	s.mux.HandleFunc("PUT /api/meshes/{meshID}", s.withAuth(s.handleUpdateMesh))
 	s.mux.HandleFunc("DELETE /api/meshes/{meshID}", s.withAuth(s.handleDeleteMesh))
+
+	// Mesh access routes (protected)
+	s.mux.HandleFunc("GET /api/meshes/{meshID}/access", s.withAuth(s.handleListMeshAccess))
+	s.mux.HandleFunc("POST /api/meshes/{meshID}/access", s.withAuth(s.handleGrantMeshAccess))
+	s.mux.HandleFunc("PUT /api/meshes/{meshID}/access/{userID}", s.withAuth(s.handleUpdateMeshAccess))
+	s.mux.HandleFunc("DELETE /api/meshes/{meshID}/access/{userID}", s.withAuth(s.handleRevokeMeshAccess))
+
+	// Admin keys routes (protected)
+	s.mux.HandleFunc("GET /api/meshes/{meshID}/admin-keys", s.withAuth(s.handleListAdminKeys))
+	s.mux.HandleFunc("POST /api/meshes/{meshID}/admin-keys", s.withAuth(s.handleCreateAdminKey))
+	s.mux.HandleFunc("GET /api/meshes/{meshID}/admin-keys/{keyID}", s.withAuth(s.handleGetAdminKey))
+	s.mux.HandleFunc("DELETE /api/meshes/{meshID}/admin-keys/{keyID}", s.withAuth(s.handleDeleteAdminKey))
+
+	// Nodes routes (protected)
+	s.mux.HandleFunc("GET /api/meshes/{meshID}/nodes", s.withAuth(s.handleListNodes))
+	s.mux.HandleFunc("POST /api/meshes/{meshID}/nodes", s.withAuth(s.handleCreateNode))
+	s.mux.HandleFunc("GET /api/meshes/{meshID}/nodes/{nodeID}", s.withAuth(s.handleGetNode))
+	s.mux.HandleFunc("PUT /api/meshes/{meshID}/nodes/{nodeID}", s.withAuth(s.handleUpdateNode))
+	s.mux.HandleFunc("PATCH /api/meshes/{meshID}/nodes/{nodeID}/status", s.withAuth(s.handleUpdateNodeStatus))
+	s.mux.HandleFunc("DELETE /api/meshes/{meshID}/nodes/{nodeID}", s.withAuth(s.handleDeleteNode))
 }
 
 // withAuth wraps a handler with authentication middleware
