@@ -12,34 +12,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package auth
 
 import (
-	"log"
-
-	"github.com/skandragon/meshmgr/internal/config"
-	"github.com/skandragon/meshmgr/internal/server"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func main() {
-	log.Println("Starting Meshtastic Node Manager")
-
-	// Load configuration from environment variables
-	cfg, err := config.Load()
+// HashPassword hashes a password using bcrypt
+func HashPassword(password string, cost int) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		return "", err
 	}
+	return string(bytes), nil
+}
 
-	// Create server instance
-	srv, err := server.New(cfg)
-	if err != nil {
-		log.Fatalf("Failed to create server: %v", err)
-	}
-	defer srv.Close()
-
-	// Start HTTP server
-	log.Printf("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
-	if err := srv.Start(); err != nil {
-		log.Fatalf("Server error: %v", err)
-	}
+// CheckPassword checks if a password matches a hash
+func CheckPassword(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

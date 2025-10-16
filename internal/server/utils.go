@@ -12,34 +12,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package server
 
 import (
-	"log"
-
-	"github.com/skandragon/meshmgr/internal/config"
-	"github.com/skandragon/meshmgr/internal/server"
+	"encoding/json"
+	"net/http"
 )
 
-func main() {
-	log.Println("Starting Meshtastic Node Manager")
+// ErrorResponse represents an error response
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
 
-	// Load configuration from environment variables
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
+// writeJSON writes a JSON response
+func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
 
-	// Create server instance
-	srv, err := server.New(cfg)
-	if err != nil {
-		log.Fatalf("Failed to create server: %v", err)
-	}
-	defer srv.Close()
-
-	// Start HTTP server
-	log.Printf("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
-	if err := srv.Start(); err != nil {
-		log.Fatalf("Server error: %v", err)
-	}
+// writeError writes an error response
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, ErrorResponse{Error: message})
 }
