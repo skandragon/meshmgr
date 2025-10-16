@@ -10,10 +10,76 @@
 	let meshName = $state('');
 	let meshDescription = $state('');
 	let loraRegion = $state('US');
-	let modemPreset = $state('LONG_FAST');
+	let modemPreset = $state('LongFast');
 	let frequencySlot = $state(0);
 	let error = $state('');
 	let initialLoad = $state(true);
+
+	// LoRa configuration fetched from backend
+	interface RegionInfo {
+		code: string;
+		name: string;
+	}
+
+	interface PresetInfo {
+		code: string;
+		name: string;
+	}
+
+	interface PresetSlots {
+		LongFast: number;
+		LongSlow: number;
+		LongMod: number;
+		MediumFast: number;
+		MediumSlow: number;
+		ShortFast: number;
+		ShortSlow: number;
+		ShortTurbo: number;
+	}
+
+	interface LoRaConfig {
+		regions: RegionInfo[];
+		presets: PresetInfo[];
+		slots: Record<string, PresetSlots>;
+	}
+
+	let loraConfig = $state<LoRaConfig | null>(null);
+
+	// Check if a preset is available for the selected region
+	function isPresetAvailable(presetCode: string): boolean {
+		if (!loraConfig) return true;
+		const maxSlot = loraConfig.slots[loraRegion]?.[presetCode as keyof PresetSlots];
+		return maxSlot !== undefined && maxSlot > 0;
+	}
+
+	// Computed slot range for current selection
+	// The value from backend is the max radio slot index (0-indexed)
+	// UI should show: 0 = hash default, 1-N = explicit slots (map to radio slots 0 to N-1)
+	const maxRadioSlot = $derived(
+		loraConfig?.slots[loraRegion]?.[modemPreset as keyof PresetSlots] ?? 319
+	);
+	const slotMax = $derived(maxRadioSlot + 1); // UI shows 0-indexed hash + 1-indexed slots
+	const slotLabel = $derived.by(() => {
+		if (maxRadioSlot === 0) {
+			return `Frequency Slot (0 = hash default only for ${loraRegion}/${modemPreset})`;
+		} else if (maxRadioSlot === 1) {
+			return `Frequency Slot (0 = hash default, 1 available for ${loraRegion}/${modemPreset})`;
+		} else {
+			return `Frequency Slot (0 = hash default, 1-${maxRadioSlot + 1} available for ${loraRegion}/${modemPreset})`;
+		}
+	});
+
+	async function loadLoRaConfig() {
+		try {
+			const response = await fetch('/api/lora-config');
+			if (!response.ok) {
+				throw new Error('Failed to fetch LoRa config');
+			}
+			loraConfig = await response.json();
+		} catch (err) {
+			console.error('Failed to load LoRa config:', err);
+		}
+	}
 
 	async function loadMeshes() {
 		loading = true;
@@ -43,7 +109,7 @@
 			meshName = '';
 			meshDescription = '';
 			loraRegion = 'US';
-			modemPreset = 'LONG_FAST';
+			modemPreset = 'LongFast';
 			frequencySlot = 0;
 			await loadMeshes();
 		} catch (err: any) {
@@ -55,6 +121,11 @@
 		await authStore.logout();
 		goto('/login');
 	}
+
+	// Load LoRa config immediately on mount
+	onMount(() => {
+		loadLoRaConfig();
+	});
 
 	// Load meshes when auth is ready
 	$effect(() => {
@@ -172,17 +243,13 @@
 									bind:value={loraRegion}
 									class="w-full px-3 py-2 border border-gray-300 rounded-md"
 								>
-									<option value="US">US</option>
-									<option value="EU_868">EU 868 MHz</option>
-									<option value="EU_433">EU 433 MHz</option>
-									<option value="CN">China</option>
-									<option value="JP">Japan</option>
-									<option value="ANZ">Australia/NZ</option>
-									<option value="KR">Korea</option>
-									<option value="TW">Taiwan</option>
-									<option value="RU">Russia</option>
-									<option value="IN">India</option>
-									<option value="TH">Thailand</option>
+									{#if loraConfig}
+										{#each loraConfig.regions as region}
+											<option value={region.code}>{region.name}</option>
+										{/each}
+									{:else}
+										<option value="US">Loading...</option>
+									{/if}
 								</select>
 							</div>
 							<div class="mb-4">
@@ -192,25 +259,25 @@
 									bind:value={modemPreset}
 									class="w-full px-3 py-2 border border-gray-300 rounded-md"
 								>
-									<option value="SHORT_TURBO">Short Range / Turbo</option>
-									<option value="SHORT_FAST">Short Range / Fast</option>
-									<option value="SHORT_SLOW">Short Range / Slow</option>
-									<option value="MEDIUM_FAST">Medium Range / Fast</option>
-									<option value="MEDIUM_SLOW">Medium Range / Slow</option>
-									<option value="LONG_FAST">Long Range / Fast</option>
-									<option value="LONG_MODERATE">Long Range / Moderate</option>
-									<option value="LONG_SLOW">Long Range / Slow</option>
-									<option value="VERY_LONG_SLOW">Very Long Range / Slow</option>
+									{#if loraConfig}
+										{#each loraConfig.presets as preset}
+											<option value={preset.code} disabled={!isPresetAvailable(preset.code)}>
+												{preset.name}{!isPresetAvailable(preset.code) ? ' (unavailable for this region)' : ''}
+											</option>
+										{/each}
+									{:else}
+										<option value="LongFast">Loading...</option>
+									{/if}
 								</select>
 							</div>
 							<div class="mb-4">
-								<label for="mesh-frequency-slot" class="block text-sm font-medium text-gray-700 mb-1">Frequency Slot (0-7)</label>
+								<label for="mesh-frequency-slot" class="block text-sm font-medium text-gray-700 mb-1">{slotLabel}</label>
 								<input
 									id="mesh-frequency-slot"
 									type="number"
 									bind:value={frequencySlot}
 									min="0"
-									max="7"
+									max={slotMax}
 									class="w-full px-3 py-2 border border-gray-300 rounded-md"
 								/>
 							</div>

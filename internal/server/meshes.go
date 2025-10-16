@@ -78,6 +78,20 @@ func (s *Server) handleCreateMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate frequency slot if provided
+	// UI uses 1-indexed slots: 0 = hash default, 1-N = radio slots 0 to N-1
+	// So valid UI range is 0 to maxRadioSlot + 1
+	if req.FrequencySlot != nil {
+		if req.LoraRegion != nil && req.ModemPreset != nil {
+			maxRadioSlot := GetMaxSlot(*req.LoraRegion, *req.ModemPreset)
+			maxUISlot := maxRadioSlot + 1
+			if *req.FrequencySlot < 0 || int(*req.FrequencySlot) > maxUISlot {
+				writeError(w, http.StatusBadRequest, "Frequency slot out of range for region/preset")
+				return
+			}
+		}
+	}
+
 	var freqSlot pgtype.Int4
 	if req.FrequencySlot != nil {
 		freqSlot = pgtype.Int4{Int32: *req.FrequencySlot, Valid: true}
@@ -166,6 +180,39 @@ func (s *Server) handleUpdateMesh(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, http.StatusInternalServerError, "Failed to check permissions")
 		return
+	}
+
+	// Validate frequency slot if provided
+	// UI uses 1-indexed slots: 0 = hash default, 1-N = radio slots 0 to N-1
+	// So valid UI range is 0 to maxRadioSlot + 1
+	if req.FrequencySlot != nil {
+		// Get current mesh to determine effective region and preset
+		currentMesh, err := s.DB().GetMeshByID(r.Context(), meshID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to get mesh for validation")
+			return
+		}
+
+		// Use new values if provided, otherwise use current values
+		effectiveRegion := currentMesh.LoraRegion
+		if req.LoraRegion != nil {
+			effectiveRegion = req.LoraRegion
+		}
+
+		effectivePreset := currentMesh.ModemPreset
+		if req.ModemPreset != nil {
+			effectivePreset = req.ModemPreset
+		}
+
+		// Only validate if we have both region and preset
+		if effectiveRegion != nil && effectivePreset != nil {
+			maxRadioSlot := GetMaxSlot(*effectiveRegion, *effectivePreset)
+			maxUISlot := maxRadioSlot + 1
+			if *req.FrequencySlot < 0 || int(*req.FrequencySlot) > maxUISlot {
+				writeError(w, http.StatusBadRequest, "Frequency slot out of range for region/preset")
+				return
+			}
+		}
 	}
 
 	var freqSlot pgtype.Int4

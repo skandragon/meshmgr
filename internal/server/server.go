@@ -68,6 +68,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 	s.mux.HandleFunc("GET /api/auth/me", s.handleMe)
 
+	// LoRa configuration (public)
+	s.mux.HandleFunc("GET /api/lora-config", s.handleGetLoRaConfig)
+
 	// Mesh routes (protected)
 	s.mux.HandleFunc("GET /api/meshes", s.withAuth(s.handleListMeshes))
 	s.mux.HandleFunc("POST /api/meshes", s.withAuth(s.handleCreateMesh))

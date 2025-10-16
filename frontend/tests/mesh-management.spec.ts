@@ -205,11 +205,19 @@ test.describe('Mesh Management', () => {
 		await expect(modal.locator('label:has-text("Modem Preset")')).toBeVisible();
 		await expect(modal.locator('label:has-text("Frequency Slot")')).toBeVisible();
 
-		// Fill in mesh with LoRa config
+		// Fill in mesh with LoRa config - use US/ShortFast (defaults, always available)
 		await modal.locator('label:has-text("Name") + input').fill('LoRa Test Mesh');
-		await modal.locator('label:has-text("LoRa Region") + select').selectOption('EU_868');
-		await modal.locator('label:has-text("Modem Preset") + select').selectOption('MEDIUM_FAST');
-		await modal.locator('label:has-text("Frequency Slot") + input').fill('3');
+
+		// Wait a moment for LoRa config to load (simple timeout approach)
+		await page.waitForTimeout(1000);
+
+		const regionSelect = modal.locator('label:has-text("LoRa Region") + select');
+		await regionSelect.selectOption('US');
+
+		const presetSelect = modal.locator('label:has-text("Modem Preset") + select');
+		await presetSelect.selectOption('ShortFast');
+
+		await modal.locator('label:has-text("Frequency Slot") + input').fill('5');
 
 		// Submit form
 		await page.getByRole('button', { name: 'Create', exact: true }).click();
