@@ -12,7 +12,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-.PHONY: all check test build lint license-check fmt clean
+.PHONY: all check test build lint license-check fmt clean generate
 
 # Default target: run tests and build
 all: test build
@@ -23,8 +23,13 @@ build:
 	@mkdir -p bin
 	go build -o bin/meshmgr ./cmd/meshmgr
 
+# Generate code (SQLC, etc.)
+generate:
+	@echo "Generating code..."
+	go generate ./...
+
 # Run tests
-test:
+test: generate
 	@echo "Running tests..."
 	go test ./...
 
