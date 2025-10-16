@@ -40,3 +40,7 @@ Thumbs.db
 # Debug files
 debug
 __debug_bin
+
+# Frontend test artifacts
+frontend/playwright-report/
+frontend/test-results/

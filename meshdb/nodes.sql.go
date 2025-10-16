@@ -8,6 +8,8 @@ package meshdb
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countNodesByMesh = `-- name: CountNodesByMesh :one
@@ -23,20 +25,21 @@ func (q *Queries) CountNodesByMesh(ctx context.Context, meshID int64) (int64, er
 }
 
 const createNode = `-- name: CreateNode :one
-INSERT INTO nodes (mesh_id, hardware_id, name, long_name, role, public_key, private_key, status)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at
+INSERT INTO nodes (mesh_id, hardware_id, name, long_name, role, public_key, private_key, status, unmessageable)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
 `
 
 type CreateNodeParams struct {
-	MeshID     int64   `json:"mesh_id"`
-	HardwareID string  `json:"hardware_id"`
-	Name       string  `json:"name"`
-	LongName   string  `json:"long_name"`
-	Role       *string `json:"role"`
-	PublicKey  *string `json:"public_key"`
-	PrivateKey *string `json:"private_key"`
-	Status     *string `json:"status"`
+	MeshID        int64   `json:"mesh_id"`
+	HardwareID    string  `json:"hardware_id"`
+	Name          string  `json:"name"`
+	LongName      string  `json:"long_name"`
+	Role          *string `json:"role"`
+	PublicKey     *string `json:"public_key"`
+	PrivateKey    *string `json:"private_key"`
+	Status        *string `json:"status"`
+	Unmessageable bool    `json:"unmessageable"`
 }
 
 func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
@@ -49,6 +52,7 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		arg.PublicKey,
 		arg.PrivateKey,
 		arg.Status,
+		arg.Unmessageable,
 	)
 	var i Node
 	err := row.Scan(
@@ -64,6 +68,15 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
 	)
 	return i, err
 }
@@ -79,7 +92,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id int64) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at FROM nodes
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
 WHERE id = $1
 `
 
@@ -99,12 +112,21 @@ func (q *Queries) GetNode(ctx context.Context, id int64) (Node, error) {
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
 	)
 	return i, err
 }
 
 const getNodeByHardwareID = `-- name: GetNodeByHardwareID :one
-SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at FROM nodes
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
 WHERE mesh_id = $1 AND hardware_id = $2
 `
 
@@ -129,12 +151,21 @@ func (q *Queries) GetNodeByHardwareID(ctx context.Context, arg GetNodeByHardware
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
 	)
 	return i, err
 }
 
 const listNodesByMesh = `-- name: ListNodesByMesh :many
-SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at FROM nodes
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
 WHERE mesh_id = $1
 ORDER BY name ASC
 `
@@ -161,6 +192,63 @@ func (q *Queries) ListNodesByMesh(ctx context.Context, meshID int64) ([]Node, er
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AppliedName,
+			&i.AppliedLongName,
+			&i.AppliedRole,
+			&i.AppliedPublicKey,
+			&i.AppliedPrivateKey,
+			&i.AppliedUnmessageable,
+			&i.Unmessageable,
+			&i.ConfigAppliedAt,
+			&i.PendingChanges,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNodesWithPendingChanges = `-- name: ListNodesWithPendingChanges :many
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
+WHERE mesh_id = $1 AND pending_changes = TRUE
+ORDER BY name ASC
+`
+
+func (q *Queries) ListNodesWithPendingChanges(ctx context.Context, meshID int64) ([]Node, error) {
+	rows, err := q.db.Query(ctx, listNodesWithPendingChanges, meshID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Node
+	for rows.Next() {
+		var i Node
+		if err := rows.Scan(
+			&i.ID,
+			&i.MeshID,
+			&i.HardwareID,
+			&i.Name,
+			&i.LongName,
+			&i.Role,
+			&i.PublicKey,
+			&i.PrivateKey,
+			&i.LastSeen,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AppliedName,
+			&i.AppliedLongName,
+			&i.AppliedRole,
+			&i.AppliedPublicKey,
+			&i.AppliedPrivateKey,
+			&i.AppliedUnmessageable,
+			&i.Unmessageable,
+			&i.ConfigAppliedAt,
+			&i.PendingChanges,
 		); err != nil {
 			return nil, err
 		}
@@ -181,21 +269,25 @@ SET
     public_key = COALESCE($4, public_key),
     private_key = COALESCE($5, private_key),
     status = COALESCE($6, status),
-    last_seen = COALESCE($7, last_seen),
+    unmessageable = COALESCE($7, unmessageable),
+    last_seen = COALESCE($8, last_seen),
+    pending_changes = COALESCE($9, pending_changes),
     updated_at = NOW()
-WHERE id = $8
-RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at
+WHERE id = $10
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
 `
 
 type UpdateNodeParams struct {
-	Name       *string    `json:"name"`
-	LongName   *string    `json:"long_name"`
-	Role       *string    `json:"role"`
-	PublicKey  *string    `json:"public_key"`
-	PrivateKey *string    `json:"private_key"`
-	Status     *string    `json:"status"`
-	LastSeen   *time.Time `json:"last_seen"`
-	ID         int64      `json:"id"`
+	Name           *string     `json:"name"`
+	LongName       *string     `json:"long_name"`
+	Role           *string     `json:"role"`
+	PublicKey      *string     `json:"public_key"`
+	PrivateKey     *string     `json:"private_key"`
+	Status         *string     `json:"status"`
+	Unmessageable  pgtype.Bool `json:"unmessageable"`
+	LastSeen       *time.Time  `json:"last_seen"`
+	PendingChanges pgtype.Bool `json:"pending_changes"`
+	ID             int64       `json:"id"`
 }
 
 func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error) {
@@ -206,7 +298,9 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		arg.PublicKey,
 		arg.PrivateKey,
 		arg.Status,
+		arg.Unmessageable,
 		arg.LastSeen,
+		arg.PendingChanges,
 		arg.ID,
 	)
 	var i Node
@@ -223,6 +317,78 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
+	)
+	return i, err
+}
+
+const updateNodeAppliedState = `-- name: UpdateNodeAppliedState :one
+UPDATE nodes
+SET
+    applied_name = $1,
+    applied_long_name = $2,
+    applied_role = $3,
+    applied_public_key = $4,
+    applied_private_key = $5,
+    applied_unmessageable = $6,
+    config_applied_at = NOW(),
+    pending_changes = FALSE,
+    updated_at = NOW()
+WHERE id = $7
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
+`
+
+type UpdateNodeAppliedStateParams struct {
+	AppliedName          *string     `json:"applied_name"`
+	AppliedLongName      *string     `json:"applied_long_name"`
+	AppliedRole          *string     `json:"applied_role"`
+	AppliedPublicKey     *string     `json:"applied_public_key"`
+	AppliedPrivateKey    *string     `json:"applied_private_key"`
+	AppliedUnmessageable pgtype.Bool `json:"applied_unmessageable"`
+	ID                   int64       `json:"id"`
+}
+
+func (q *Queries) UpdateNodeAppliedState(ctx context.Context, arg UpdateNodeAppliedStateParams) (Node, error) {
+	row := q.db.QueryRow(ctx, updateNodeAppliedState,
+		arg.AppliedName,
+		arg.AppliedLongName,
+		arg.AppliedRole,
+		arg.AppliedPublicKey,
+		arg.AppliedPrivateKey,
+		arg.AppliedUnmessageable,
+		arg.ID,
+	)
+	var i Node
+	err := row.Scan(
+		&i.ID,
+		&i.MeshID,
+		&i.HardwareID,
+		&i.Name,
+		&i.LongName,
+		&i.Role,
+		&i.PublicKey,
+		&i.PrivateKey,
+		&i.LastSeen,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
 	)
 	return i, err
 }
@@ -234,7 +400,7 @@ SET
     last_seen = NOW(),
     updated_at = NOW()
 WHERE id = $2
-RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
 `
 
 type UpdateNodeStatusParams struct {
@@ -258,6 +424,15 @@ func (q *Queries) UpdateNodeStatus(ctx context.Context, arg UpdateNodeStatusPara
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
 	)
 	return i, err
 }

@@ -1,6 +1,6 @@
 -- name: CreateMesh :one
-INSERT INTO meshes (owner_id, name, description)
-VALUES (@owner_id, @name, @description)
+INSERT INTO meshes (owner_id, name, description, lora_region, modem_preset, frequency_slot)
+VALUES (@owner_id, @name, @description, @lora_region, @modem_preset, @frequency_slot)
 RETURNING *;
 
 -- name: GetMeshByID :one
@@ -12,6 +12,9 @@ UPDATE meshes
 SET
     name = COALESCE(sqlc.narg('name'), name),
     description = COALESCE(sqlc.narg('description'), description),
+    lora_region = COALESCE(sqlc.narg('lora_region'), lora_region),
+    modem_preset = COALESCE(sqlc.narg('modem_preset'), modem_preset),
+    frequency_slot = COALESCE(sqlc.narg('frequency_slot'), frequency_slot),
     updated_at = NOW()
 WHERE id = @id
 RETURNING *;

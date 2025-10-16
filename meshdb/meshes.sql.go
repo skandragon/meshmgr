@@ -7,22 +7,34 @@ package meshdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createMesh = `-- name: CreateMesh :one
-INSERT INTO meshes (owner_id, name, description)
-VALUES ($1, $2, $3)
-RETURNING id, owner_id, name, description, created_at, updated_at
+INSERT INTO meshes (owner_id, name, description, lora_region, modem_preset, frequency_slot)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot
 `
 
 type CreateMeshParams struct {
-	OwnerID     int64   `json:"owner_id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
+	OwnerID       int64       `json:"owner_id"`
+	Name          string      `json:"name"`
+	Description   *string     `json:"description"`
+	LoraRegion    *string     `json:"lora_region"`
+	ModemPreset   *string     `json:"modem_preset"`
+	FrequencySlot pgtype.Int4 `json:"frequency_slot"`
 }
 
 func (q *Queries) CreateMesh(ctx context.Context, arg CreateMeshParams) (Mesh, error) {
-	row := q.db.QueryRow(ctx, createMesh, arg.OwnerID, arg.Name, arg.Description)
+	row := q.db.QueryRow(ctx, createMesh,
+		arg.OwnerID,
+		arg.Name,
+		arg.Description,
+		arg.LoraRegion,
+		arg.ModemPreset,
+		arg.FrequencySlot,
+	)
 	var i Mesh
 	err := row.Scan(
 		&i.ID,
@@ -31,6 +43,9 @@ func (q *Queries) CreateMesh(ctx context.Context, arg CreateMeshParams) (Mesh, e
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LoraRegion,
+		&i.ModemPreset,
+		&i.FrequencySlot,
 	)
 	return i, err
 }
@@ -46,7 +61,7 @@ func (q *Queries) DeleteMesh(ctx context.Context, id int64) error {
 }
 
 const getMeshByID = `-- name: GetMeshByID :one
-SELECT id, owner_id, name, description, created_at, updated_at FROM meshes
+SELECT id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot FROM meshes
 WHERE id = $1
 `
 
@@ -60,12 +75,15 @@ func (q *Queries) GetMeshByID(ctx context.Context, id int64) (Mesh, error) {
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LoraRegion,
+		&i.ModemPreset,
+		&i.FrequencySlot,
 	)
 	return i, err
 }
 
 const listMeshesByOwner = `-- name: ListMeshesByOwner :many
-SELECT id, owner_id, name, description, created_at, updated_at FROM meshes
+SELECT id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot FROM meshes
 WHERE owner_id = $1
 ORDER BY created_at DESC
 `
@@ -86,6 +104,9 @@ func (q *Queries) ListMeshesByOwner(ctx context.Context, ownerID int64) ([]Mesh,
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LoraRegion,
+			&i.ModemPreset,
+			&i.FrequencySlot,
 		); err != nil {
 			return nil, err
 		}
@@ -98,7 +119,7 @@ func (q *Queries) ListMeshesByOwner(ctx context.Context, ownerID int64) ([]Mesh,
 }
 
 const listMeshesByUser = `-- name: ListMeshesByUser :many
-SELECT DISTINCT m.id, m.owner_id, m.name, m.description, m.created_at, m.updated_at FROM meshes m
+SELECT DISTINCT m.id, m.owner_id, m.name, m.description, m.created_at, m.updated_at, m.lora_region, m.modem_preset, m.frequency_slot FROM meshes m
 LEFT JOIN mesh_access ma ON m.id = ma.mesh_id
 WHERE m.owner_id = $1 OR ma.user_id = $1
 ORDER BY m.created_at DESC
@@ -120,6 +141,9 @@ func (q *Queries) ListMeshesByUser(ctx context.Context, userID int64) ([]Mesh, e
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LoraRegion,
+			&i.ModemPreset,
+			&i.FrequencySlot,
 		); err != nil {
 			return nil, err
 		}
@@ -136,19 +160,32 @@ UPDATE meshes
 SET
     name = COALESCE($1, name),
     description = COALESCE($2, description),
+    lora_region = COALESCE($3, lora_region),
+    modem_preset = COALESCE($4, modem_preset),
+    frequency_slot = COALESCE($5, frequency_slot),
     updated_at = NOW()
-WHERE id = $3
-RETURNING id, owner_id, name, description, created_at, updated_at
+WHERE id = $6
+RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot
 `
 
 type UpdateMeshParams struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	ID          int64   `json:"id"`
+	Name          *string     `json:"name"`
+	Description   *string     `json:"description"`
+	LoraRegion    *string     `json:"lora_region"`
+	ModemPreset   *string     `json:"modem_preset"`
+	FrequencySlot pgtype.Int4 `json:"frequency_slot"`
+	ID            int64       `json:"id"`
 }
 
 func (q *Queries) UpdateMesh(ctx context.Context, arg UpdateMeshParams) (Mesh, error) {
-	row := q.db.QueryRow(ctx, updateMesh, arg.Name, arg.Description, arg.ID)
+	row := q.db.QueryRow(ctx, updateMesh,
+		arg.Name,
+		arg.Description,
+		arg.LoraRegion,
+		arg.ModemPreset,
+		arg.FrequencySlot,
+		arg.ID,
+	)
 	var i Mesh
 	err := row.Scan(
 		&i.ID,
@@ -157,6 +194,9 @@ func (q *Queries) UpdateMesh(ctx context.Context, arg UpdateMeshParams) (Mesh, e
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LoraRegion,
+		&i.ModemPreset,
+		&i.FrequencySlot,
 	)
 	return i, err
 }

@@ -6,6 +6,8 @@ package meshdb
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AdminKey struct {
@@ -18,12 +20,15 @@ type AdminKey struct {
 }
 
 type Mesh struct {
-	ID          int64     `json:"id"`
-	OwnerID     int64     `json:"owner_id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID            int64       `json:"id"`
+	OwnerID       int64       `json:"owner_id"`
+	Name          string      `json:"name"`
+	Description   *string     `json:"description"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
+	LoraRegion    *string     `json:"lora_region"`
+	ModemPreset   *string     `json:"modem_preset"`
+	FrequencySlot pgtype.Int4 `json:"frequency_slot"`
 }
 
 type MeshAccess struct {
@@ -36,18 +41,35 @@ type MeshAccess struct {
 }
 
 type Node struct {
-	ID         int64      `json:"id"`
-	MeshID     int64      `json:"mesh_id"`
-	HardwareID string     `json:"hardware_id"`
-	Name       string     `json:"name"`
-	LongName   string     `json:"long_name"`
-	Role       *string    `json:"role"`
-	PublicKey  *string    `json:"public_key"`
-	PrivateKey *string    `json:"private_key"`
-	LastSeen   *time.Time `json:"last_seen"`
-	Status     *string    `json:"status"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID                   int64       `json:"id"`
+	MeshID               int64       `json:"mesh_id"`
+	HardwareID           string      `json:"hardware_id"`
+	Name                 string      `json:"name"`
+	LongName             string      `json:"long_name"`
+	Role                 *string     `json:"role"`
+	PublicKey            *string     `json:"public_key"`
+	PrivateKey           *string     `json:"private_key"`
+	LastSeen             *time.Time  `json:"last_seen"`
+	Status               *string     `json:"status"`
+	CreatedAt            time.Time   `json:"created_at"`
+	UpdatedAt            time.Time   `json:"updated_at"`
+	AppliedName          *string     `json:"applied_name"`
+	AppliedLongName      *string     `json:"applied_long_name"`
+	AppliedRole          *string     `json:"applied_role"`
+	AppliedPublicKey     *string     `json:"applied_public_key"`
+	AppliedPrivateKey    *string     `json:"applied_private_key"`
+	AppliedUnmessageable pgtype.Bool `json:"applied_unmessageable"`
+	Unmessageable        bool        `json:"unmessageable"`
+	ConfigAppliedAt      *time.Time  `json:"config_applied_at"`
+	PendingChanges       bool        `json:"pending_changes"`
+}
+
+type NodeAdminKey struct {
+	ID         int64     `json:"id"`
+	NodeID     int64     `json:"node_id"`
+	AdminKeyID int64     `json:"admin_key_id"`
+	AppliedAt  time.Time `json:"applied_at"`
+	IsCurrent  bool      `json:"is_current"`
 }
 
 type Session struct {

@@ -119,6 +119,9 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 	migrations := []string{
 		"1760580803_initial_schema.up.sql",
 		"1760587537_add_nodes.up.sql",
+		"1760605927_add_mesh_lora_config.up.sql",
+		"1760605928_add_node_state_tracking.up.sql",
+		"1760605929_add_node_admin_keys_mapping.up.sql",
 	}
 
 	for _, migration := range migrations {
@@ -524,7 +527,9 @@ func TestLogoutEndpoint(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 }
 
-func TestMeshAccessManagement(t *testing.T) {
+// TestMeshAccessManagement is disabled because mesh access sharing feature was removed
+func TestMeshAccessManagement_DISABLED(t *testing.T) {
+	t.Skip("Mesh access feature removed")
 	ts := setupTestServer(t)
 
 	// Register two users

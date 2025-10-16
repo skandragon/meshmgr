@@ -20,19 +20,26 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/skandragon/meshmgr/meshdb"
 )
 
 // CreateMeshRequest represents a request to create a mesh
 type CreateMeshRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
+	Name          string  `json:"name"`
+	Description   *string `json:"description,omitempty"`
+	LoraRegion    *string `json:"lora_region,omitempty"`
+	ModemPreset   *string `json:"modem_preset,omitempty"`
+	FrequencySlot *int32  `json:"frequency_slot,omitempty"`
 }
 
 // UpdateMeshRequest represents a request to update a mesh
 type UpdateMeshRequest struct {
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Name          *string `json:"name,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	LoraRegion    *string `json:"lora_region,omitempty"`
+	ModemPreset   *string `json:"modem_preset,omitempty"`
+	FrequencySlot *int32  `json:"frequency_slot,omitempty"`
 }
 
 // handleListMeshes handles listing meshes for the current user
@@ -71,10 +78,18 @@ func (s *Server) handleCreateMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var freqSlot pgtype.Int4
+	if req.FrequencySlot != nil {
+		freqSlot = pgtype.Int4{Int32: *req.FrequencySlot, Valid: true}
+	}
+
 	mesh, err := s.DB().CreateMesh(r.Context(), meshdb.CreateMeshParams{
-		OwnerID:     user.ID,
-		Name:        req.Name,
-		Description: req.Description,
+		OwnerID:       user.ID,
+		Name:          req.Name,
+		Description:   req.Description,
+		LoraRegion:    req.LoraRegion,
+		ModemPreset:   req.ModemPreset,
+		FrequencySlot: freqSlot,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create mesh")
@@ -153,10 +168,18 @@ func (s *Server) handleUpdateMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var freqSlot pgtype.Int4
+	if req.FrequencySlot != nil {
+		freqSlot = pgtype.Int4{Int32: *req.FrequencySlot, Valid: true}
+	}
+
 	params := meshdb.UpdateMeshParams{
-		ID:          meshID,
-		Name:        req.Name,
-		Description: req.Description,
+		ID:            meshID,
+		Name:          req.Name,
+		Description:   req.Description,
+		LoraRegion:    req.LoraRegion,
+		ModemPreset:   req.ModemPreset,
+		FrequencySlot: freqSlot,
 	}
 
 	updatedMesh, err := s.DB().UpdateMesh(r.Context(), params)

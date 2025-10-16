@@ -20,28 +20,32 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/skandragon/meshmgr/meshdb"
 )
 
 // CreateNodeRequest represents a request to create a node
 type CreateNodeRequest struct {
-	HardwareID string  `json:"hardware_id"`
-	Name       string  `json:"name"`
-	LongName   string  `json:"long_name"`
-	Role       *string `json:"role,omitempty"`
-	PublicKey  *string `json:"public_key,omitempty"`
-	PrivateKey *string `json:"private_key,omitempty"`
-	Status     *string `json:"status,omitempty"`
+	HardwareID    string  `json:"hardware_id"`
+	Name          string  `json:"name"`
+	LongName      string  `json:"long_name"`
+	Role          *string `json:"role,omitempty"`
+	PublicKey     *string `json:"public_key,omitempty"`
+	PrivateKey    *string `json:"private_key,omitempty"`
+	Status        *string `json:"status,omitempty"`
+	Unmessageable *bool   `json:"unmessageable,omitempty"`
 }
 
 // UpdateNodeRequest represents a request to update a node
 type UpdateNodeRequest struct {
-	Name       *string `json:"name,omitempty"`
-	LongName   *string `json:"long_name,omitempty"`
-	Role       *string `json:"role,omitempty"`
-	PublicKey  *string `json:"public_key,omitempty"`
-	PrivateKey *string `json:"private_key,omitempty"`
-	Status     *string `json:"status,omitempty"`
+	Name           *string `json:"name,omitempty"`
+	LongName       *string `json:"long_name,omitempty"`
+	Role           *string `json:"role,omitempty"`
+	PublicKey      *string `json:"public_key,omitempty"`
+	PrivateKey     *string `json:"private_key,omitempty"`
+	Status         *string `json:"status,omitempty"`
+	Unmessageable  *bool   `json:"unmessageable,omitempty"`
+	PendingChanges *bool   `json:"pending_changes,omitempty"`
 }
 
 // UpdateNodeStatusRequest represents a request to update node status
@@ -181,15 +185,21 @@ func (s *Server) handleCreateNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create the node
+	unmessageable := false
+	if req.Unmessageable != nil {
+		unmessageable = *req.Unmessageable
+	}
+
 	node, err := s.DB().CreateNode(r.Context(), meshdb.CreateNodeParams{
-		MeshID:     meshID,
-		HardwareID: req.HardwareID,
-		Name:       req.Name,
-		LongName:   req.LongName,
-		Role:       req.Role,
-		PublicKey:  req.PublicKey,
-		PrivateKey: req.PrivateKey,
-		Status:     req.Status,
+		MeshID:        meshID,
+		HardwareID:    req.HardwareID,
+		Name:          req.Name,
+		LongName:      req.LongName,
+		Role:          req.Role,
+		PublicKey:     req.PublicKey,
+		PrivateKey:    req.PrivateKey,
+		Status:        req.Status,
+		Unmessageable: unmessageable,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create node")
@@ -254,15 +264,27 @@ func (s *Server) handleUpdateNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the node
+	var unmessageable pgtype.Bool
+	if req.Unmessageable != nil {
+		unmessageable = pgtype.Bool{Bool: *req.Unmessageable, Valid: true}
+	}
+
+	var pendingChanges pgtype.Bool
+	if req.PendingChanges != nil {
+		pendingChanges = pgtype.Bool{Bool: *req.PendingChanges, Valid: true}
+	}
+
 	updatedNode, err := s.DB().UpdateNode(r.Context(), meshdb.UpdateNodeParams{
-		ID:         nodeID,
-		Name:       req.Name,
-		LongName:   req.LongName,
-		Role:       req.Role,
-		PublicKey:  req.PublicKey,
-		PrivateKey: req.PrivateKey,
-		Status:     req.Status,
-		LastSeen:   nil, // Don't update last_seen on manual updates
+		ID:             nodeID,
+		Name:           req.Name,
+		LongName:       req.LongName,
+		Role:           req.Role,
+		PublicKey:      req.PublicKey,
+		PrivateKey:     req.PrivateKey,
+		Status:         req.Status,
+		Unmessageable:  unmessageable,
+		PendingChanges: pendingChanges,
+		LastSeen:       nil, // Don't update last_seen on manual updates
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to update node")
