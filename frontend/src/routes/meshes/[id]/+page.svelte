@@ -161,10 +161,20 @@
 			<div class="px-4 py-6 sm:px-0">
 				<div class="bg-white shadow rounded-lg">
 					<div class="p-6 border-b">
-						<h1 class="text-3xl font-bold text-gray-900">{mesh.name}</h1>
-						{#if mesh.description}
-							<p class="text-gray-600 mt-2">{mesh.description}</p>
-						{/if}
+						<div class="flex justify-between items-start">
+							<div>
+								<h1 class="text-3xl font-bold text-gray-900">{mesh.name}</h1>
+								{#if mesh.description}
+									<p class="text-gray-600 mt-2">{mesh.description}</p>
+								{/if}
+							</div>
+							<a
+								href="/meshes/{meshId}/edit"
+								class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium"
+							>
+								Edit Mesh
+							</a>
+						</div>
 					</div>
 
 					<div class="border-b">

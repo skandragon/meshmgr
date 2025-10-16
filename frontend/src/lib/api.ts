@@ -139,21 +139,17 @@ class ApiClient {
 
 	async updateMesh(
 		id: number,
-		name?: string,
-		description?: string,
-		loraRegion?: string,
-		modemPreset?: string,
-		frequencySlot?: number
+		data: {
+			name?: string;
+			description?: string;
+			lora_region?: string;
+			modem_preset?: string;
+			frequency_slot?: number;
+		}
 	) {
 		return this.request(`/api/meshes/${id}`, {
 			method: 'PUT',
-			body: JSON.stringify({
-				name,
-				description,
-				lora_region: loraRegion,
-				modem_preset: modemPreset,
-				frequency_slot: frequencySlot
-			}),
+			body: JSON.stringify(data),
 		});
 	}
 
