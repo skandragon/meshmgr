@@ -4,13 +4,25 @@ test.describe('Mesh Management', () => {
 	let userEmail: string;
 	let userPassword: string;
 
-	async function createMesh(page: any, name: string, description?: string) {
+	async function createMesh(page: any, name: string, description?: string, loraRegion?: string, modemPreset?: string, frequencySlot?: number) {
 		await page.getByRole('button', { name: 'Create Mesh' }).click();
 		await expect(page.getByRole('heading', { name: 'Create New Mesh' })).toBeVisible();
-		await page.locator('input[type="text"]').first().fill(name);
+
+		const modal = page.locator('div.fixed').filter({ hasText: 'Create New Mesh' });
+		await modal.locator('label:has-text("Name") + input').fill(name);
 		if (description) {
-			await page.locator('textarea').first().fill(description);
+			await modal.locator('textarea').first().fill(description);
 		}
+		if (loraRegion) {
+			await modal.locator('label:has-text("LoRa Region") + select').selectOption(loraRegion);
+		}
+		if (modemPreset) {
+			await modal.locator('label:has-text("Modem Preset") + select').selectOption(modemPreset);
+		}
+		if (frequencySlot !== undefined) {
+			await modal.locator('label:has-text("Frequency Slot") + input').fill(frequencySlot.toString());
+		}
+
 		await page.getByRole('button', { name: 'Create', exact: true }).click();
 		await expect(page.getByText(name).first()).toBeVisible({ timeout: 10000 });
 	}
@@ -180,5 +192,95 @@ test.describe('Mesh Management', () => {
 		// Verify key is gone
 		await expect(page.getByText('No admin keys yet.')).toBeVisible({ timeout: 10000 });
 		await expect(page.getByRole('button', { name: 'Add Key' })).not.toBeDisabled();
+	});
+
+	test('should create mesh with LoRa configuration', async ({ page }) => {
+		// Click create mesh button
+		await page.getByRole('button', { name: 'Create Mesh' }).click();
+		await expect(page.getByRole('heading', { name: 'Create New Mesh' })).toBeVisible();
+
+		// Verify LoRa config fields exist
+		const modal = page.locator('div.fixed').filter({ hasText: 'Create New Mesh' });
+		await expect(modal.locator('label:has-text("LoRa Region")')).toBeVisible();
+		await expect(modal.locator('label:has-text("Modem Preset")')).toBeVisible();
+		await expect(modal.locator('label:has-text("Frequency Slot")')).toBeVisible();
+
+		// Fill in mesh with LoRa config
+		await modal.locator('label:has-text("Name") + input').fill('LoRa Test Mesh');
+		await modal.locator('label:has-text("LoRa Region") + select').selectOption('EU_868');
+		await modal.locator('label:has-text("Modem Preset") + select').selectOption('MEDIUM_FAST');
+		await modal.locator('label:has-text("Frequency Slot") + input').fill('3');
+
+		// Submit form
+		await page.getByRole('button', { name: 'Create', exact: true }).click();
+
+		// Verify mesh appears
+		await expect(page.getByText('LoRa Test Mesh')).toBeVisible({ timeout: 10000 });
+	});
+
+	test('should add node with unmessageable flag', async ({ page }) => {
+		// Create mesh and navigate to it
+		await createMesh(page, 'Unmessageable Test Mesh');
+		await page.getByText('Unmessageable Test Mesh').first().click();
+
+		// Add node with unmessageable flag
+		await page.getByRole('button', { name: 'Add Node' }).click();
+		await expect(page.getByRole('heading', { name: 'Add New Node' })).toBeVisible();
+
+		const modal = page.locator('div.fixed').filter({ hasText: 'Add New Node' });
+		await modal.locator('label:has-text("Hardware ID") + input').fill('!test123');
+		await modal.locator('label:has-text("Name") + input').first().fill('silent-node');
+		await modal.locator('label:has-text("Long Name") + input').fill('Silent Node');
+
+		// Check unmessageable checkbox
+		await modal.locator('label:has-text("Unmessageable") input[type="checkbox"]').check();
+
+		// Submit
+		await modal.getByRole('button', { name: 'Add Node' }).click();
+
+		// Verify node appears
+		await expect(page.getByText('silent-node')).toBeVisible({ timeout: 10000 });
+
+		// Expand the node to verify unmessageable state
+		const expandButton = page.locator('button[aria-label="Toggle details"]').first();
+		await expandButton.click();
+		await expect(page.getByText('Configuration State')).toBeVisible();
+		await expect(page.getByText('DESIRED STATE')).toBeVisible();
+	});
+
+	test('should expand node to show state comparison', async ({ page }) => {
+		// Create mesh and add a node
+		await createMesh(page, 'State Expansion Test');
+		await page.getByText('State Expansion Test').first().click();
+
+		// Add node
+		await page.getByRole('button', { name: 'Add Node' }).click();
+		await expect(page.getByRole('heading', { name: 'Add New Node' })).toBeVisible();
+		const modal = page.locator('div.fixed').filter({ hasText: 'Add New Node' });
+		await modal.locator('label:has-text("Hardware ID") + input').fill('!expand123');
+		await modal.locator('label:has-text("Name") + input').first().fill('expand-test');
+		await modal.locator('label:has-text("Long Name") + input').fill('Expansion Test Node');
+		await modal.locator('label:has-text("Role") + select').selectOption('CLIENT');
+		await modal.getByRole('button', { name: 'Add Node' }).click();
+
+		// Wait for node to appear
+		await expect(page.getByText('expand-test')).toBeVisible({ timeout: 10000 });
+
+		// Find and click the expand button (▶ arrow)
+		const expandButton = page.locator('button[aria-label="Toggle details"]').first();
+		await expandButton.click();
+
+		// Verify state comparison section appears
+		await expect(page.getByText('Configuration State')).toBeVisible();
+		await expect(page.getByText('DESIRED STATE')).toBeVisible();
+		await expect(page.getByText('APPLIED STATE')).toBeVisible();
+		await expect(page.getByText('Never applied to device')).toBeVisible();
+
+		// Verify the expansion arrow changed to ▼
+		await expect(expandButton).toContainText('▼');
+
+		// Click again to collapse
+		await expandButton.click();
+		await expect(page.getByText('Configuration State')).not.toBeVisible();
 	});
 });

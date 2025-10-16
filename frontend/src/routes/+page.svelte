@@ -9,10 +9,13 @@
 	let showCreateModal = $state(false);
 	let meshName = $state('');
 	let meshDescription = $state('');
+	let loraRegion = $state('US');
+	let modemPreset = $state('LONG_FAST');
+	let frequencySlot = $state(0);
 	let error = $state('');
+	let initialLoad = $state(true);
 
 	async function loadMeshes() {
-		if (!authStore.isAuthenticated) return;
 		loading = true;
 		try {
 			const result = await api.listMeshes();
@@ -29,10 +32,19 @@
 		e.preventDefault();
 		error = '';
 		try {
-			await api.createMesh(meshName, meshDescription || undefined);
+			await api.createMesh(
+				meshName,
+				meshDescription || undefined,
+				loraRegion,
+				modemPreset,
+				frequencySlot
+			);
 			showCreateModal = false;
 			meshName = '';
 			meshDescription = '';
+			loraRegion = 'US';
+			modemPreset = 'LONG_FAST';
+			frequencySlot = 0;
 			await loadMeshes();
 		} catch (err: any) {
 			error = err.message || 'Failed to create mesh';
@@ -44,8 +56,10 @@
 		goto('/login');
 	}
 
-	onMount(() => {
-		if (authStore.isAuthenticated) {
+	// Load meshes when auth is ready
+	$effect(() => {
+		if (authStore.isAuthenticated && !authStore.loading && initialLoad) {
+			initialLoad = false;
 			loadMeshes();
 		}
 	});
@@ -148,6 +162,52 @@
 									class="w-full px-3 py-2 border border-gray-300 rounded-md"
 									rows="3"
 								></textarea>
+							</div>
+							<div class="mb-4">
+								<label class="block text-sm font-medium text-gray-700 mb-1">LoRa Region</label>
+								<select
+									bind:value={loraRegion}
+									class="w-full px-3 py-2 border border-gray-300 rounded-md"
+								>
+									<option value="US">US</option>
+									<option value="EU_868">EU 868 MHz</option>
+									<option value="EU_433">EU 433 MHz</option>
+									<option value="CN">China</option>
+									<option value="JP">Japan</option>
+									<option value="ANZ">Australia/NZ</option>
+									<option value="KR">Korea</option>
+									<option value="TW">Taiwan</option>
+									<option value="RU">Russia</option>
+									<option value="IN">India</option>
+									<option value="TH">Thailand</option>
+								</select>
+							</div>
+							<div class="mb-4">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Modem Preset</label>
+								<select
+									bind:value={modemPreset}
+									class="w-full px-3 py-2 border border-gray-300 rounded-md"
+								>
+									<option value="SHORT_TURBO">Short Range / Turbo</option>
+									<option value="SHORT_FAST">Short Range / Fast</option>
+									<option value="SHORT_SLOW">Short Range / Slow</option>
+									<option value="MEDIUM_FAST">Medium Range / Fast</option>
+									<option value="MEDIUM_SLOW">Medium Range / Slow</option>
+									<option value="LONG_FAST">Long Range / Fast</option>
+									<option value="LONG_MODERATE">Long Range / Moderate</option>
+									<option value="LONG_SLOW">Long Range / Slow</option>
+									<option value="VERY_LONG_SLOW">Very Long Range / Slow</option>
+								</select>
+							</div>
+							<div class="mb-4">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Frequency Slot (0-7)</label>
+								<input
+									type="number"
+									bind:value={frequencySlot}
+									min="0"
+									max="7"
+									class="w-full px-3 py-2 border border-gray-300 rounded-md"
+								/>
 							</div>
 							{#if error}
 								<p class="text-red-600 text-sm mb-4">{error}</p>

@@ -114,10 +114,22 @@ class ApiClient {
 		return this.request('/api/meshes');
 	}
 
-	async createMesh(name: string, description?: string) {
+	async createMesh(
+		name: string,
+		description?: string,
+		loraRegion?: string,
+		modemPreset?: string,
+		frequencySlot?: number
+	) {
 		return this.request('/api/meshes', {
 			method: 'POST',
-			body: JSON.stringify({ name, description }),
+			body: JSON.stringify({
+				name,
+				description,
+				lora_region: loraRegion,
+				modem_preset: modemPreset,
+				frequency_slot: frequencySlot
+			}),
 		});
 	}
 
@@ -125,10 +137,23 @@ class ApiClient {
 		return this.request(`/api/meshes/${id}`);
 	}
 
-	async updateMesh(id: number, name?: string, description?: string) {
+	async updateMesh(
+		id: number,
+		name?: string,
+		description?: string,
+		loraRegion?: string,
+		modemPreset?: string,
+		frequencySlot?: number
+	) {
 		return this.request(`/api/meshes/${id}`, {
 			method: 'PUT',
-			body: JSON.stringify({ name, description }),
+			body: JSON.stringify({
+				name,
+				description,
+				lora_region: loraRegion,
+				modem_preset: modemPreset,
+				frequency_slot: frequencySlot
+			}),
 		});
 	}
 
@@ -202,6 +227,7 @@ class ApiClient {
 		public_key?: string;
 		private_key?: string;
 		status?: string;
+		unmessageable?: boolean;
 	}) {
 		return this.request(`/api/meshes/${meshId}/nodes`, {
 			method: 'POST',
@@ -216,6 +242,8 @@ class ApiClient {
 		public_key?: string;
 		private_key?: string;
 		status?: string;
+		unmessageable?: boolean;
+		pending_changes?: boolean;
 	}) {
 		return this.request(`/api/meshes/${meshId}/nodes/${nodeId}`, {
 			method: 'PUT',

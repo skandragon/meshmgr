@@ -13,13 +13,25 @@
 	let nodes = $state<any[]>([]);
 	let nodesLoading = $state(false);
 	let showNodeModal = $state(false);
+	let expandedNodes = $state<Set<number>>(new Set());
 	let nodeForm = $state({
 		hardware_id: '',
 		name: '',
 		long_name: '',
 		role: '',
-		status: ''
+		status: '',
+		unmessageable: false
 	});
+
+	function toggleNodeExpansion(nodeId: number) {
+		const newSet = new Set(expandedNodes);
+		if (newSet.has(nodeId)) {
+			newSet.delete(nodeId);
+		} else {
+			newSet.add(nodeId);
+		}
+		expandedNodes = newSet;
+	}
 
 	// Admin Keys state
 	let adminKeys = $state<any[]>([]);
@@ -59,7 +71,7 @@
 		try {
 			await api.createNode(meshId, nodeForm);
 			showNodeModal = false;
-			nodeForm = { hardware_id: '', name: '', long_name: '', role: '', status: '' };
+			nodeForm = { hardware_id: '', name: '', long_name: '', role: '', status: '', unmessageable: false };
 			await loadNodes();
 		} catch (err: any) {
 			error = err.message || 'Failed to create node';
@@ -203,6 +215,7 @@
 									<table class="min-w-full divide-y divide-gray-200">
 										<thead class="bg-gray-50">
 											<tr>
+												<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8"></th>
 												<th
 													class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
 													>Name</th
@@ -219,15 +232,35 @@
 													class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
 													>Status</th
 												>
+												<th
+													class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+													>Flags</th
+												>
 												<th class="px-6 py-3 text-right"></th>
 											</tr>
 										</thead>
 										<tbody class="bg-white divide-y divide-gray-200">
 											{#each nodes as node}
-												<tr>
+												<tr class="{node.pending_changes ? 'bg-yellow-50' : ''}">
+													<td class="px-2 py-4 whitespace-nowrap text-sm text-gray-500">
+														<button
+															onclick={() => toggleNodeExpansion(node.id)}
+															class="text-gray-600 hover:text-gray-900 p-1"
+															aria-label="Toggle details"
+														>
+															{#if expandedNodes.has(node.id)}
+																▼
+															{:else}
+																▶
+															{/if}
+														</button>
+													</td>
 													<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
 														{node.name}
 														<div class="text-xs text-gray-500">{node.long_name}</div>
+														{#if node.pending_changes}
+															<div class="text-xs text-yellow-600 font-medium">⚠ Pending changes</div>
+														{/if}
 													</td>
 													<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 														{node.hardware_id}
@@ -238,6 +271,15 @@
 													<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 														{node.status || '-'}
 													</td>
+													<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+														{#if node.unmessageable}
+															<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+																🔇 Unmessageable
+															</span>
+														{:else}
+															<span class="text-gray-400">-</span>
+														{/if}
+													</td>
 													<td class="px-6 py-4 whitespace-nowrap text-right text-sm">
 														<button
 															onclick={() => handleDeleteNode(node.id)}
@@ -247,6 +289,80 @@
 														</button>
 													</td>
 												</tr>
+												{#if expandedNodes.has(node.id)}
+													<tr class="{node.pending_changes ? 'bg-yellow-50' : 'bg-gray-50'}">
+														<td colspan="7" class="px-6 py-4">
+															<div class="text-sm">
+																<h4 class="font-semibold mb-3 text-gray-900">Configuration State</h4>
+																<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+																	<div>
+																		<div class="text-xs font-medium text-gray-500 mb-2">DESIRED STATE</div>
+																		<div class="space-y-2 text-xs">
+																			<div class="flex justify-between">
+																				<span class="font-medium">Name:</span>
+																				<span class="{node.name !== node.applied_name && node.applied_name ? 'text-orange-600 font-semibold' : ''}">{node.name}</span>
+																			</div>
+																			<div class="flex justify-between">
+																				<span class="font-medium">Long Name:</span>
+																				<span class="{node.long_name !== node.applied_long_name && node.applied_long_name ? 'text-orange-600 font-semibold' : ''}">{node.long_name}</span>
+																			</div>
+																			<div class="flex justify-between">
+																				<span class="font-medium">Role:</span>
+																				<span class="{node.role !== node.applied_role && node.applied_role ? 'text-orange-600 font-semibold' : ''}">{node.role || '-'}</span>
+																			</div>
+																			<div class="flex justify-between">
+																				<span class="font-medium">Unmessageable:</span>
+																				<span class="{node.unmessageable !== node.applied_unmessageable && node.applied_unmessageable !== null ? 'text-orange-600 font-semibold' : ''}">{node.unmessageable ? 'Yes' : 'No'}</span>
+																			</div>
+																			{#if node.public_key}
+																				<div class="flex justify-between">
+																					<span class="font-medium">Public Key:</span>
+																					<span class="font-mono {node.public_key !== node.applied_public_key && node.applied_public_key ? 'text-orange-600 font-semibold' : ''}">{node.public_key.substring(0, 12)}...</span>
+																				</div>
+																			{/if}
+																		</div>
+																	</div>
+																	<div>
+																		<div class="text-xs font-medium text-gray-500 mb-2">APPLIED STATE</div>
+																		<div class="space-y-2 text-xs">
+																			<div class="flex justify-between">
+																				<span class="font-medium">Name:</span>
+																				<span>{node.applied_name || '-'}</span>
+																			</div>
+																			<div class="flex justify-between">
+																				<span class="font-medium">Long Name:</span>
+																				<span>{node.applied_long_name || '-'}</span>
+																			</div>
+																			<div class="flex justify-between">
+																				<span class="font-medium">Role:</span>
+																				<span>{node.applied_role || '-'}</span>
+																			</div>
+																			<div class="flex justify-between">
+																				<span class="font-medium">Unmessageable:</span>
+																				<span>{node.applied_unmessageable !== null ? (node.applied_unmessageable ? 'Yes' : 'No') : '-'}</span>
+																			</div>
+																			{#if node.public_key}
+																				<div class="flex justify-between">
+																					<span class="font-medium">Public Key:</span>
+																					<span class="font-mono">{node.applied_public_key ? node.applied_public_key.substring(0, 12) + '...' : '-'}</span>
+																				</div>
+																			{/if}
+																		</div>
+																		{#if node.config_applied_at}
+																			<div class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600">
+																				Last applied: {new Date(node.config_applied_at).toLocaleString()}
+																			</div>
+																		{:else}
+																			<div class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500 italic">
+																				Never applied to device
+																			</div>
+																		{/if}
+																	</div>
+																</div>
+															</div>
+														</td>
+													</tr>
+												{/if}
 											{/each}
 										</tbody>
 									</table>
@@ -364,6 +480,16 @@
 						bind:value={nodeForm.status}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md"
 					/>
+				</div>
+				<div class="mb-4">
+					<label class="flex items-center">
+						<input
+							type="checkbox"
+							bind:checked={nodeForm.unmessageable}
+							class="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded"
+						/>
+						<span class="text-sm font-medium text-gray-700">Unmessageable (cannot receive direct messages)</span>
+					</label>
 				</div>
 				{#if error}
 					<p class="text-red-600 text-sm mb-4">{error}</p>
