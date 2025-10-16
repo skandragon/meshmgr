@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+type AdminKey struct {
+	ID        int64     `json:"id"`
+	MeshID    int64     `json:"mesh_id"`
+	PublicKey string    `json:"public_key"`
+	KeyName   *string   `json:"key_name"`
+	AddedBy   int64     `json:"added_by"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Mesh struct {
 	ID          int64     `json:"id"`
 	OwnerID     int64     `json:"owner_id"`
@@ -24,6 +33,21 @@ type MeshAccess struct {
 	AccessLevel string    `json:"access_level"`
 	GrantedBy   *int64    `json:"granted_by"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Node struct {
+	ID         int64      `json:"id"`
+	MeshID     int64      `json:"mesh_id"`
+	HardwareID string     `json:"hardware_id"`
+	Name       string     `json:"name"`
+	LongName   string     `json:"long_name"`
+	Role       *string    `json:"role"`
+	PublicKey  *string    `json:"public_key"`
+	PrivateKey *string    `json:"private_key"`
+	LastSeen   *time.Time `json:"last_seen"`
+	Status     *string    `json:"status"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 type Session struct {

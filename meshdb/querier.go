@@ -10,29 +10,42 @@ import (
 
 type Querier interface {
 	CheckUserMeshAccess(ctx context.Context, arg CheckUserMeshAccessParams) (string, error)
+	CountAdminKeysByMesh(ctx context.Context, meshID int64) (int64, error)
+	CountNodesByMesh(ctx context.Context, meshID int64) (int64, error)
+	CreateAdminKey(ctx context.Context, arg CreateAdminKeyParams) (AdminKey, error)
 	CreateMesh(ctx context.Context, arg CreateMeshParams) (Mesh, error)
+	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAdminKey(ctx context.Context, id int64) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteMesh(ctx context.Context, id int64) error
+	DeleteNode(ctx context.Context, id int64) error
 	DeleteSession(ctx context.Context, token string) error
 	DeleteUser(ctx context.Context, id int64) error
 	DeleteUserSessions(ctx context.Context, userID int64) error
+	GetAdminKey(ctx context.Context, id int64) (AdminKey, error)
 	GetMeshAccess(ctx context.Context, arg GetMeshAccessParams) (MeshAccess, error)
 	GetMeshByID(ctx context.Context, id int64) (Mesh, error)
+	GetNode(ctx context.Context, id int64) (Node, error)
+	GetNodeByHardwareID(ctx context.Context, arg GetNodeByHardwareIDParams) (Node, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	GetUserSessions(ctx context.Context, userID int64) ([]Session, error)
 	GrantMeshAccess(ctx context.Context, arg GrantMeshAccessParams) (MeshAccess, error)
+	ListAdminKeysByMesh(ctx context.Context, meshID int64) ([]AdminKey, error)
 	ListMeshAccessByMesh(ctx context.Context, meshID int64) ([]ListMeshAccessByMeshRow, error)
 	ListMeshAccessByUser(ctx context.Context, userID int64) ([]ListMeshAccessByUserRow, error)
 	ListMeshesByOwner(ctx context.Context, ownerID int64) ([]Mesh, error)
 	ListMeshesByUser(ctx context.Context, userID int64) ([]Mesh, error)
+	ListNodesByMesh(ctx context.Context, meshID int64) ([]Node, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	RevokeMeshAccess(ctx context.Context, arg RevokeMeshAccessParams) error
 	UpdateMesh(ctx context.Context, arg UpdateMeshParams) (Mesh, error)
 	UpdateMeshAccess(ctx context.Context, arg UpdateMeshAccessParams) (MeshAccess, error)
+	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
+	UpdateNodeStatus(ctx context.Context, arg UpdateNodeStatusParams) (Node, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 }
 
