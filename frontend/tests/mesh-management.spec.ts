@@ -181,46 +181,4 @@ test.describe('Mesh Management', () => {
 		await expect(page.getByText('No admin keys yet.')).toBeVisible({ timeout: 10000 });
 		await expect(page.getByRole('button', { name: 'Add Key' })).not.toBeDisabled();
 	});
-
-	test('should grant and revoke mesh access', async ({ page }) => {
-		// Create a second user first
-		const secondUserEmail = `viewer-${Date.now()}@example.com`;
-
-		// Open new context to create second user
-		const context = page.context();
-		const secondPage = await context.newPage();
-		await secondPage.goto('/register');
-		await secondPage.fill('input[name="displayName"]', 'Viewer User');
-		await secondPage.fill('input[name="email"]', secondUserEmail);
-		await secondPage.fill('input[name="password"]', 'password123');
-		await secondPage.click('button[type="submit"]');
-		await secondPage.close();
-
-		// Back to main page - create mesh
-		await createMesh(page, 'Access Test Mesh');
-		await page.getByText('Access Test Mesh').first().click();
-
-		// Switch to Access tab
-		await page.getByRole('button', { name: 'Access' }).click();
-		await expect(page.getByText('No shared access yet.')).toBeVisible({ timeout: 10000 });
-
-		// Grant access to second user
-		await page.getByRole('button', { name: 'Grant Access' }).click();
-		await expect(page.getByRole('heading', { name: 'Grant Access' })).toBeVisible();
-		const modal = page.locator('div.fixed').filter({ hasText: 'Grant Access' });
-		await modal.locator('input[type="email"]').fill(secondUserEmail);
-		await modal.locator('select').selectOption('viewer');
-		await modal.getByRole('button', { name: 'Grant Access' }).click();
-
-		// Verify access is granted
-		await expect(page.getByText(secondUserEmail)).toBeVisible({ timeout: 10000 });
-		await expect(page.getByText('viewer')).toBeVisible();
-
-		// Revoke access
-		page.on('dialog', dialog => dialog.accept());
-		await page.getByRole('button', { name: 'Revoke' }).click();
-
-		// Verify access is revoked
-		await expect(page.getByText('No shared access yet.')).toBeVisible({ timeout: 10000 });
-	});
 });

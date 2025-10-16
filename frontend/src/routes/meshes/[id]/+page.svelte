@@ -28,12 +28,6 @@
 	let showKeyModal = $state(false);
 	let keyForm = $state({ public_key: '', key_name: '' });
 
-	// Access state
-	let accessList = $state<any[]>([]);
-	let accessLoading = $state(false);
-	let showAccessModal = $state(false);
-	let accessForm = $state({ user_email: '', access_level: 'viewer' });
-
 	let error = $state('');
 
 	async function loadMesh() {
@@ -119,47 +113,10 @@
 		}
 	}
 
-	async function loadAccess() {
-		accessLoading = true;
-		try {
-			const result = await api.listMeshAccess(meshId);
-			accessList = result || [];
-		} catch (err: any) {
-			console.error('Failed to load access list:', err);
-			accessList = [];
-		} finally {
-			accessLoading = false;
-		}
-	}
-
-	async function handleGrantAccess(e: Event) {
-		e.preventDefault();
-		error = '';
-		try {
-			await api.grantMeshAccess(meshId, accessForm.user_email, accessForm.access_level);
-			showAccessModal = false;
-			accessForm = { user_email: '', access_level: 'viewer' };
-			await loadAccess();
-		} catch (err: any) {
-			error = err.message || 'Failed to grant access';
-		}
-	}
-
-	async function handleRevokeAccess(userId: number) {
-		if (!confirm('Are you sure you want to revoke access?')) return;
-		try {
-			await api.revokeMeshAccess(meshId, userId);
-			await loadAccess();
-		} catch (err: any) {
-			error = err.message || 'Failed to revoke access';
-		}
-	}
-
 	function changeTab(tab: string) {
 		activeTab = tab;
 		if (tab === 'nodes' && nodes.length === 0) loadNodes();
 		if (tab === 'keys' && adminKeys.length === 0) loadAdminKeys();
-		if (tab === 'access' && accessList.length === 0) loadAccess();
 	}
 
 	onMount(() => {
@@ -216,14 +173,6 @@
 									: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
 							>
 								Admin Keys
-							</button>
-							<button
-								onclick={() => changeTab('access')}
-								class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'access'
-									? 'border-blue-500 text-blue-600'
-									: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
-							>
-								Access
 							</button>
 						</nav>
 					</div>
@@ -343,75 +292,6 @@
 											</div>
 										</div>
 									{/each}
-								</div>
-							{/if}
-						{:else if activeTab === 'access'}
-							<div class="flex justify-between items-center mb-4">
-								<h2 class="text-xl font-semibold">Access Management</h2>
-								<button
-									onclick={() => (showAccessModal = true)}
-									class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
-								>
-									Grant Access
-								</button>
-							</div>
-
-							{#if accessLoading}
-								<p class="text-gray-500">Loading access list...</p>
-							{:else if accessList.length === 0}
-								<p class="text-gray-600">No shared access yet.</p>
-							{:else}
-								<div class="overflow-x-auto">
-									<table class="min-w-full divide-y divide-gray-200">
-										<thead class="bg-gray-50">
-											<tr>
-												<th
-													class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-													>User</th
-												>
-												<th
-													class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-													>Access Level</th
-												>
-												<th
-													class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-													>Granted</th
-												>
-												<th class="px-6 py-3 text-right"></th>
-											</tr>
-										</thead>
-										<tbody class="bg-white divide-y divide-gray-200">
-											{#each accessList as access}
-												<tr>
-													<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-														{access.display_name}
-														<div class="text-xs text-gray-500">{access.email}</div>
-													</td>
-													<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-														<span
-															class="px-2 py-1 text-xs rounded-full {access.access_level ===
-															'admin'
-																? 'bg-purple-100 text-purple-800'
-																: 'bg-green-100 text-green-800'}"
-														>
-															{access.access_level}
-														</span>
-													</td>
-													<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-														{new Date(access.created_at).toLocaleDateString()}
-													</td>
-													<td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-														<button
-															onclick={() => handleRevokeAccess(access.user_id)}
-															class="text-red-600 hover:text-red-900"
-														>
-															Revoke
-														</button>
-													</td>
-												</tr>
-											{/each}
-										</tbody>
-									</table>
 								</div>
 							{/if}
 						{/if}
@@ -537,54 +417,6 @@
 						class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
 					>
 						Add Key
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}
-
-<!-- Grant Access Modal -->
-{#if showAccessModal}
-	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-		<div class="bg-white rounded-lg p-6 max-w-md w-full">
-			<h3 class="text-lg font-bold mb-4">Grant Access</h3>
-			<form onsubmit={handleGrantAccess}>
-				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">User Email</label>
-					<input
-						type="email"
-						bind:value={accessForm.user_email}
-						required
-						class="w-full px-3 py-2 border border-gray-300 rounded-md"
-					/>
-				</div>
-				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">Access Level</label>
-					<select
-						bind:value={accessForm.access_level}
-						class="w-full px-3 py-2 border border-gray-300 rounded-md"
-					>
-						<option value="viewer">Viewer</option>
-						<option value="admin">Admin</option>
-					</select>
-				</div>
-				{#if error}
-					<p class="text-red-600 text-sm mb-4">{error}</p>
-				{/if}
-				<div class="flex justify-end space-x-2">
-					<button
-						type="button"
-						onclick={() => (showAccessModal = false)}
-						class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
-					>
-						Grant Access
 					</button>
 				</div>
 			</form>

@@ -75,12 +75,6 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("PUT /api/meshes/{meshID}", s.withAuth(s.handleUpdateMesh))
 	s.mux.HandleFunc("DELETE /api/meshes/{meshID}", s.withAuth(s.handleDeleteMesh))
 
-	// Mesh access routes (protected)
-	s.mux.HandleFunc("GET /api/meshes/{meshID}/access", s.withAuth(s.handleListMeshAccess))
-	s.mux.HandleFunc("POST /api/meshes/{meshID}/access", s.withAuth(s.handleGrantMeshAccess))
-	s.mux.HandleFunc("PUT /api/meshes/{meshID}/access/{userID}", s.withAuth(s.handleUpdateMeshAccess))
-	s.mux.HandleFunc("DELETE /api/meshes/{meshID}/access/{userID}", s.withAuth(s.handleRevokeMeshAccess))
-
 	// Admin keys routes (protected)
 	s.mux.HandleFunc("GET /api/meshes/{meshID}/admin-keys", s.withAuth(s.handleListAdminKeys))
 	s.mux.HandleFunc("POST /api/meshes/{meshID}/admin-keys", s.withAuth(s.handleCreateAdminKey))
