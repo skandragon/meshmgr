@@ -15,9 +15,11 @@
 		if (!authStore.isAuthenticated) return;
 		loading = true;
 		try {
-			meshes = await api.listMeshes();
+			const result = await api.listMeshes();
+			meshes = result || [];
 		} catch (err: any) {
 			console.error('Failed to load meshes:', err);
+			meshes = [];
 		} finally {
 			loading = false;
 		}
