@@ -19,11 +19,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/skandragon/meshmgr/internal/config"
 	"github.com/skandragon/meshmgr/meshdb"
@@ -33,7 +29,7 @@ import (
 type Server struct {
 	config *config.Config
 	db     *pgxpool.Pool
-	router *chi.Mux
+	mux    *http.ServeMux
 }
 
 // New creates a new Server instance
@@ -53,72 +49,49 @@ func New(cfg *config.Config) (*Server, error) {
 	s := &Server{
 		config: cfg,
 		db:     pool,
-		router: chi.NewRouter(),
+		mux:    http.NewServeMux(),
 	}
 
-	s.setupMiddleware()
 	s.setupRoutes()
 
 	return s, nil
 }
 
-// setupMiddleware configures middleware for the router
-func (s *Server) setupMiddleware() {
-	s.router.Use(middleware.RequestID)
-	s.router.Use(middleware.RealIP)
-	s.router.Use(middleware.Logger)
-	s.router.Use(middleware.Recoverer)
-	s.router.Use(middleware.Timeout(60 * time.Second))
-
-	// CORS configuration
-	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
-}
-
 // setupRoutes configures all routes
 func (s *Server) setupRoutes() {
 	// Health check
-	s.router.Get("/health", s.handleHealth)
+	s.mux.HandleFunc("GET /health", s.handleHealth)
 
-	// API routes
-	s.router.Route("/api", func(r chi.Router) {
-		// Auth routes (public)
-		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", s.handleRegister)
-			r.Post("/login", s.handleLogin)
-			r.Post("/logout", s.handleLogout)
-			r.Get("/me", s.handleMe)
-		})
+	// Auth routes (public)
+	s.mux.HandleFunc("POST /api/auth/register", s.handleRegister)
+	s.mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	s.mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
+	s.mux.HandleFunc("GET /api/auth/me", s.handleMe)
 
-		// Protected routes (require authentication)
-		r.Group(func(r chi.Router) {
-			r.Use(s.authMiddleware)
+	// Mesh routes (protected)
+	s.mux.HandleFunc("GET /api/meshes", s.withAuth(s.handleListMeshes))
+	s.mux.HandleFunc("POST /api/meshes", s.withAuth(s.handleCreateMesh))
+	s.mux.HandleFunc("GET /api/meshes/{meshID}", s.withAuth(s.handleGetMesh))
+	s.mux.HandleFunc("PUT /api/meshes/{meshID}", s.withAuth(s.handleUpdateMesh))
+	s.mux.HandleFunc("DELETE /api/meshes/{meshID}", s.withAuth(s.handleDeleteMesh))
+}
 
-			// Mesh routes
-			r.Route("/meshes", func(r chi.Router) {
-				r.Get("/", s.handleListMeshes)
-				r.Post("/", s.handleCreateMesh)
-				r.Route("/{meshID}", func(r chi.Router) {
-					r.Get("/", s.handleGetMesh)
-					r.Put("/", s.handleUpdateMesh)
-					r.Delete("/", s.handleDeleteMesh)
-				})
-			})
-		})
-	})
+// withAuth wraps a handler with authentication middleware
+func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.authMiddleware(http.HandlerFunc(next)).ServeHTTP(w, r)
+	}
 }
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Server.Host, s.config.Server.Port)
 	log.Printf("Starting server on %s", addr)
-	return http.ListenAndServe(addr, s.router)
+
+	// Apply middleware to the entire mux
+	handler := chain(s.mux, corsMiddleware, loggingMiddleware, recovererMiddleware)
+
+	return http.ListenAndServe(addr, handler)
 }
 
 // Close closes the server and database connections

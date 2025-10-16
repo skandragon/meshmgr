@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/orlangure/gnomock"
 	"github.com/orlangure/gnomock/preset/postgres"
@@ -102,9 +101,8 @@ func setupTestServer(t *testing.T) *testServer {
 	srv := &Server{
 		config: cfg,
 		db:     pool,
-		router: chi.NewRouter(),
+		mux:    http.NewServeMux(),
 	}
-	srv.setupMiddleware()
 	srv.setupRoutes()
 
 	return &testServer{
@@ -145,7 +143,7 @@ func (ts *testServer) makeRequest(t *testing.T, method, path string, body interf
 	}
 
 	rr := httptest.NewRecorder()
-	ts.server.router.ServeHTTP(rr, req)
+	ts.server.mux.ServeHTTP(rr, req)
 
 	return rr
 }

@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/skandragon/meshmgr/meshdb"
 )
@@ -93,7 +92,7 @@ func (s *Server) handleGetMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	meshIDStr := chi.URLParam(r, "meshID")
+	meshIDStr := r.PathValue("meshID")
 	meshID, err := strconv.ParseInt(meshIDStr, 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid mesh ID")
@@ -121,7 +120,7 @@ func (s *Server) handleUpdateMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	meshIDStr := chi.URLParam(r, "meshID")
+	meshIDStr := r.PathValue("meshID")
 	meshID, err := strconv.ParseInt(meshIDStr, 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid mesh ID")
@@ -174,7 +173,7 @@ func (s *Server) handleDeleteMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	meshIDStr := chi.URLParam(r, "meshID")
+	meshIDStr := r.PathValue("meshID")
 	meshID, err := strconv.ParseInt(meshIDStr, 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid mesh ID")
