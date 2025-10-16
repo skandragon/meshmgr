@@ -10,34 +10,38 @@ test.describe('Mesh Management', () => {
 		userPassword = 'testpassword123';
 
 		await page.goto('/register');
-		await page.fill('input[type="email"]', userEmail);
-		await page.fill('input[type="password"]', userPassword);
-		await page.fill('input[placeholder*="name" i]', 'Test User');
+		await page.fill('input[name="displayName"]', 'Test User');
+		await page.fill('input[name="email"]', userEmail);
+		await page.fill('input[name="password"]', userPassword);
 		await page.click('button[type="submit"]');
 
 		// Wait for redirect to dashboard
-		await expect(page).toHaveURL('/');
+		await expect(page).toHaveURL('/', { timeout: 10000 });
 	});
 
 	test('should create a new mesh', async ({ page }) => {
 		// Click create mesh button
 		await page.click('text=Create Mesh');
 
+		// Wait for modal to appear
+		await page.waitForSelector('text=Create New Mesh');
+
 		// Fill in mesh details
-		await page.fill('input[type="text"]', 'Test Mesh');
-		await page.fill('textarea', 'This is a test mesh');
+		await page.locator('label:has-text("Name") + input').fill('Test Mesh');
+		await page.locator('label:has-text("Description") + textarea').fill('This is a test mesh');
 
 		// Submit form
 		await page.click('button[type="submit"]:has-text("Create")');
 
 		// Wait for modal to close and mesh to appear
-		await expect(page.locator('text=Test Mesh').first()).toBeVisible();
+		await expect(page.locator('text=Test Mesh').first()).toBeVisible({ timeout: 10000 });
 	});
 
 	test('should navigate to mesh detail page', async ({ page }) => {
 		// Create a mesh first
 		await page.click('text=Create Mesh');
-		await page.fill('input[type="text"]', 'Detail Test Mesh');
+		await page.waitForSelector('text=Create New Mesh');
+		await page.locator('label:has-text("Name") + input').fill('Detail Test Mesh');
 		await page.click('button[type="submit"]:has-text("Create")');
 
 		// Click on the mesh to view details
@@ -51,7 +55,8 @@ test.describe('Mesh Management', () => {
 	test('should add a node to mesh', async ({ page }) => {
 		// Create mesh
 		await page.click('text=Create Mesh');
-		await page.fill('input[type="text"]', 'Node Test Mesh');
+		await page.waitForSelector('text=Create New Mesh');
+		await page.locator('label:has-text("Name") + input').fill('Node Test Mesh');
 		await page.click('button[type="submit"]:has-text("Create")');
 
 		// Navigate to mesh detail
@@ -80,7 +85,8 @@ test.describe('Mesh Management', () => {
 	test('should delete a node', async ({ page }) => {
 		// Create mesh and add node
 		await page.click('text=Create Mesh');
-		await page.fill('input[type="text"]', 'Delete Node Mesh');
+		await page.waitForSelector('text=Create New Mesh');
+		await page.locator('label:has-text("Name") + input').fill('Delete Node Mesh');
 		await page.click('button[type="submit"]:has-text("Create")');
 		await page.click('text=Delete Node Mesh');
 
@@ -105,7 +111,8 @@ test.describe('Mesh Management', () => {
 	test('should add admin keys (up to 3)', async ({ page }) => {
 		// Create mesh
 		await page.click('text=Create Mesh');
-		await page.fill('input[type="text"]', 'Keys Test Mesh');
+		await page.waitForSelector('text=Create New Mesh');
+		await page.locator('label:has-text("Name") + input').fill('Keys Test Mesh');
 		await page.click('button[type="submit"]:has-text("Create")');
 		await page.click('text=Keys Test Mesh');
 
@@ -141,7 +148,8 @@ test.describe('Mesh Management', () => {
 	test('should delete an admin key', async ({ page }) => {
 		// Create mesh and add a key
 		await page.click('text=Create Mesh');
-		await page.fill('input[type="text"]', 'Delete Key Mesh');
+		await page.waitForSelector('text=Create New Mesh');
+		await page.locator('label:has-text("Name") + input').fill('Delete Key Mesh');
 		await page.click('button[type="submit"]:has-text("Create")');
 		await page.click('text=Delete Key Mesh');
 
@@ -171,15 +179,16 @@ test.describe('Mesh Management', () => {
 		const context = page.context();
 		const secondPage = await context.newPage();
 		await secondPage.goto('/register');
-		await secondPage.fill('input[type="email"]', secondUserEmail);
-		await secondPage.fill('input[type="password"]', 'password123');
-		await secondPage.fill('input[placeholder*="name" i]', 'Viewer User');
+		await secondPage.fill('input[name="displayName"]', 'Viewer User');
+		await secondPage.fill('input[name="email"]', secondUserEmail);
+		await secondPage.fill('input[name="password"]', 'password123');
 		await secondPage.click('button[type="submit"]');
 		await secondPage.close();
 
 		// Back to main page - create mesh
 		await page.click('text=Create Mesh');
-		await page.fill('input[type="text"]', 'Access Test Mesh');
+		await page.waitForSelector('text=Create New Mesh');
+		await page.locator('label:has-text("Name") + input').fill('Access Test Mesh');
 		await page.click('button[type="submit"]:has-text("Create")');
 		await page.click('text=Access Test Mesh');
 
