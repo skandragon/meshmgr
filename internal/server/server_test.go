@@ -116,13 +116,19 @@ func setupTestServer(t *testing.T) *testServer {
 func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 
-	// Read and execute migration file
-	migrationPath := filepath.Join("..", "..", "meshdb", "migrations", "1760580803_initial_schema.up.sql")
-	migrationSQL, err := os.ReadFile(migrationPath)
-	require.NoError(t, err)
+	migrations := []string{
+		"1760580803_initial_schema.up.sql",
+		"1760587537_add_nodes.up.sql",
+	}
 
-	_, err = pool.Exec(context.Background(), string(migrationSQL))
-	require.NoError(t, err)
+	for _, migration := range migrations {
+		migrationPath := filepath.Join("..", "..", "meshdb", "migrations", migration)
+		migrationSQL, err := os.ReadFile(migrationPath)
+		require.NoError(t, err)
+
+		_, err = pool.Exec(context.Background(), string(migrationSQL))
+		require.NoError(t, err)
+	}
 }
 
 // makeRequest is a helper to make HTTP requests to the test server
@@ -466,22 +472,21 @@ func TestMeshOwnership(t *testing.T) {
 	json.Unmarshal(rr.Body.Bytes(), &mesh)
 	meshID := mesh.ID
 
-	// User 2 should not be able to see User 1's mesh
+	// User 2 should not be able to see User 1's mesh (no access)
 	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d", meshID), nil, token2)
-	// This returns the mesh but ideally should check mesh_access table
-	// For MVP, we just check ownership on update/delete
+	assert.Equal(t, http.StatusNotFound, rr.Code)
 
-	// User 2 should not be able to update User 1's mesh
+	// User 2 should not be able to update User 1's mesh (no access)
 	updateDesc := "Hacked description"
 	updateReq := UpdateMeshRequest{
 		Description: &updateDesc,
 	}
 	rr = ts.makeRequest(t, "PUT", fmt.Sprintf("/api/meshes/%d", meshID), updateReq, token2)
-	assert.Equal(t, http.StatusForbidden, rr.Code)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
 
-	// User 2 should not be able to delete User 1's mesh
+	// User 2 should not be able to delete User 1's mesh (no access)
 	rr = ts.makeRequest(t, "DELETE", fmt.Sprintf("/api/meshes/%d", meshID), nil, token2)
-	assert.Equal(t, http.StatusForbidden, rr.Code)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
 
 	// User 1 should still be able to update
 	rr = ts.makeRequest(t, "PUT", fmt.Sprintf("/api/meshes/%d", meshID), updateReq, token1)
@@ -517,4 +522,273 @@ func TestLogoutEndpoint(t *testing.T) {
 	// This test documents current behavior - sessions are deleted but JWT still validates
 	rr = ts.makeRequest(t, "GET", "/api/auth/me", nil, token)
 	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestMeshAccessManagement(t *testing.T) {
+	ts := setupTestServer(t)
+
+	// Register two users
+	user1Req := RegisterRequest{
+		Email:       "owner@example.com",
+		Password:    "password1",
+		DisplayName: "Owner User",
+	}
+	rr := ts.makeRequest(t, "POST", "/api/auth/register", user1Req, "")
+	require.Equal(t, http.StatusCreated, rr.Code)
+	var auth1 AuthResponse
+	json.Unmarshal(rr.Body.Bytes(), &auth1)
+	token1 := auth1.Token
+
+	user2Req := RegisterRequest{
+		Email:       "viewer@example.com",
+		Password:    "password2",
+		DisplayName: "Viewer User",
+	}
+	rr = ts.makeRequest(t, "POST", "/api/auth/register", user2Req, "")
+	require.Equal(t, http.StatusCreated, rr.Code)
+	var auth2 AuthResponse
+	json.Unmarshal(rr.Body.Bytes(), &auth2)
+	token2 := auth2.Token
+
+	// User 1 creates a mesh
+	desc := "Test mesh"
+	createReq := CreateMeshRequest{
+		Name:        "Test Mesh",
+		Description: &desc,
+	}
+	rr = ts.makeRequest(t, "POST", "/api/meshes", createReq, token1)
+	require.Equal(t, http.StatusCreated, rr.Code)
+	var mesh meshdb.Mesh
+	json.Unmarshal(rr.Body.Bytes(), &mesh)
+	meshID := mesh.ID
+
+	// User 2 cannot access the mesh initially
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d", meshID), nil, token2)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+
+	// Owner grants viewer access to User 2
+	grantReq := GrantAccessRequest{
+		UserEmail:   "viewer@example.com",
+		AccessLevel: "viewer",
+	}
+	rr = ts.makeRequest(t, "POST", fmt.Sprintf("/api/meshes/%d/access", meshID), grantReq, token1)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+
+	// User 2 can now view the mesh
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d", meshID), nil, token2)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// User 2 cannot update the mesh (viewer level)
+	updateReq := UpdateMeshRequest{Description: &desc}
+	rr = ts.makeRequest(t, "PUT", fmt.Sprintf("/api/meshes/%d", meshID), updateReq, token2)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+
+	// List mesh access
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/access", meshID), nil, token1)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// Update User 2's access to admin
+	updateAccessReq := UpdateAccessRequest{AccessLevel: "admin"}
+	rr = ts.makeRequest(t, "PUT", fmt.Sprintf("/api/meshes/%d/access/%d", meshID, auth2.User.ID), updateAccessReq, token1)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// User 2 can now update the mesh (admin level)
+	rr = ts.makeRequest(t, "PUT", fmt.Sprintf("/api/meshes/%d", meshID), updateReq, token2)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// User 2 still cannot delete the mesh (requires owner)
+	rr = ts.makeRequest(t, "DELETE", fmt.Sprintf("/api/meshes/%d", meshID), nil, token2)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+
+	// Revoke User 2's access
+	rr = ts.makeRequest(t, "DELETE", fmt.Sprintf("/api/meshes/%d/access/%d", meshID, auth2.User.ID), nil, token1)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// User 2 cannot access the mesh anymore
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d", meshID), nil, token2)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAdminKeys(t *testing.T) {
+	ts := setupTestServer(t)
+
+	// Register user and create mesh
+	registerReq := RegisterRequest{
+		Email:       "admin@example.com",
+		Password:    "password",
+		DisplayName: "Admin User",
+	}
+	rr := ts.makeRequest(t, "POST", "/api/auth/register", registerReq, "")
+	require.Equal(t, http.StatusCreated, rr.Code)
+	var authResp AuthResponse
+	json.Unmarshal(rr.Body.Bytes(), &authResp)
+	token := authResp.Token
+
+	desc := "Test mesh"
+	createReq := CreateMeshRequest{
+		Name:        "Test Mesh",
+		Description: &desc,
+	}
+	rr = ts.makeRequest(t, "POST", "/api/meshes", createReq, token)
+	require.Equal(t, http.StatusCreated, rr.Code)
+	var mesh meshdb.Mesh
+	json.Unmarshal(rr.Body.Bytes(), &mesh)
+	meshID := mesh.ID
+
+	// List admin keys (should be empty)
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// Add first admin key
+	keyName1 := "Key 1"
+	addKeyReq1 := CreateAdminKeyRequest{
+		PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...",
+		KeyName:   &keyName1,
+	}
+	rr = ts.makeRequest(t, "POST", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), addKeyReq1, token)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	var key1 meshdb.AdminKey
+	json.Unmarshal(rr.Body.Bytes(), &key1)
+
+	// Add second admin key
+	keyName2 := "Key 2"
+	addKeyReq2 := CreateAdminKeyRequest{
+		PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD...",
+		KeyName:   &keyName2,
+	}
+	rr = ts.makeRequest(t, "POST", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), addKeyReq2, token)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+
+	// Add third admin key
+	keyName3 := "Key 3"
+	addKeyReq3 := CreateAdminKeyRequest{
+		PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQE...",
+		KeyName:   &keyName3,
+	}
+	rr = ts.makeRequest(t, "POST", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), addKeyReq3, token)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+
+	// Try to add fourth key (should fail - max 3)
+	keyName4 := "Key 4"
+	addKeyReq4 := CreateAdminKeyRequest{
+		PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQF...",
+		KeyName:   &keyName4,
+	}
+	rr = ts.makeRequest(t, "POST", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), addKeyReq4, token)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+	// List admin keys (should have 3)
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	var keys []meshdb.AdminKey
+	json.Unmarshal(rr.Body.Bytes(), &keys)
+	assert.Len(t, keys, 3)
+
+	// Get single admin key
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/admin-keys/%d", meshID, key1.ID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// Delete an admin key
+	rr = ts.makeRequest(t, "DELETE", fmt.Sprintf("/api/meshes/%d/admin-keys/%d", meshID, key1.ID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// List admin keys (should have 2)
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	json.Unmarshal(rr.Body.Bytes(), &keys)
+	assert.Len(t, keys, 2)
+
+	// Can now add another key
+	rr = ts.makeRequest(t, "POST", fmt.Sprintf("/api/meshes/%d/admin-keys", meshID), addKeyReq4, token)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+}
+
+func TestNodeManagement(t *testing.T) {
+	ts := setupTestServer(t)
+
+	// Register user and create mesh
+	registerReq := RegisterRequest{
+		Email:       "node@example.com",
+		Password:    "password",
+		DisplayName: "Node User",
+	}
+	rr := ts.makeRequest(t, "POST", "/api/auth/register", registerReq, "")
+	require.Equal(t, http.StatusCreated, rr.Code)
+	var authResp AuthResponse
+	json.Unmarshal(rr.Body.Bytes(), &authResp)
+	token := authResp.Token
+
+	desc := "Test mesh"
+	createReq := CreateMeshRequest{
+		Name:        "Test Mesh",
+		Description: &desc,
+	}
+	rr = ts.makeRequest(t, "POST", "/api/meshes", createReq, token)
+	require.Equal(t, http.StatusCreated, rr.Code)
+	var mesh meshdb.Mesh
+	json.Unmarshal(rr.Body.Bytes(), &mesh)
+	meshID := mesh.ID
+
+	// List nodes (should be empty)
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/nodes", meshID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// Create a node
+	role := "CLIENT"
+	status := "online"
+	createNodeReq := CreateNodeRequest{
+		HardwareID: "!abc123",
+		Name:       "node1",
+		LongName:   "Node One",
+		Role:       &role,
+		Status:     &status,
+	}
+	rr = ts.makeRequest(t, "POST", fmt.Sprintf("/api/meshes/%d/nodes", meshID), createNodeReq, token)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	var node meshdb.Node
+	json.Unmarshal(rr.Body.Bytes(), &node)
+	nodeID := node.ID
+	assert.Equal(t, "!abc123", node.HardwareID)
+	assert.Equal(t, "node1", node.Name)
+
+	// Get the node
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/nodes/%d", meshID, nodeID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// Update the node
+	newName := "updated-node1"
+	updateNodeReq := UpdateNodeRequest{
+		Name: &newName,
+	}
+	rr = ts.makeRequest(t, "PUT", fmt.Sprintf("/api/meshes/%d/nodes/%d", meshID, nodeID), updateNodeReq, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	json.Unmarshal(rr.Body.Bytes(), &node)
+	assert.Equal(t, "updated-node1", node.Name)
+	assert.Equal(t, "Node One", node.LongName) // Should remain unchanged
+
+	// Update node status
+	updateStatusReq := UpdateNodeStatusRequest{
+		Status: "offline",
+	}
+	rr = ts.makeRequest(t, "PATCH", fmt.Sprintf("/api/meshes/%d/nodes/%d/status", meshID, nodeID), updateStatusReq, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	json.Unmarshal(rr.Body.Bytes(), &node)
+	assert.Equal(t, "offline", *node.Status)
+
+	// List nodes (should have 1)
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/nodes", meshID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	var nodes []meshdb.Node
+	json.Unmarshal(rr.Body.Bytes(), &nodes)
+	assert.Len(t, nodes, 1)
+
+	// Delete the node
+	rr = ts.makeRequest(t, "DELETE", fmt.Sprintf("/api/meshes/%d/nodes/%d", meshID, nodeID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// List nodes (should be empty)
+	rr = ts.makeRequest(t, "GET", fmt.Sprintf("/api/meshes/%d/nodes", meshID), nil, token)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	json.Unmarshal(rr.Body.Bytes(), &nodes)
+	assert.Len(t, nodes, 0)
 }
