@@ -16,7 +16,7 @@
 		loading = true;
 		try {
 			const result = await api.listMeshes();
-			meshes = result || [];
+			meshes = Array.isArray(result) ? result : [];
 		} catch (err: any) {
 			console.error('Failed to load meshes:', err);
 			meshes = [];

@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 
-	let meshId = $derived(parseInt($page.params.id));
+	let meshId = $derived(parseInt($page.params.id || '0'));
 	let mesh = $state<any>(null);
 	let loading = $state(true);
 	let activeTab = $state('nodes');
@@ -45,7 +44,7 @@
 		nodesLoading = true;
 		try {
 			const result = await api.listNodes(meshId);
-			nodes = result || [];
+			nodes = Array.isArray(result) ? result : [];
 		} catch (err: any) {
 			console.error('Failed to load nodes:', err);
 			nodes = [];
@@ -81,7 +80,7 @@
 		keysLoading = true;
 		try {
 			const result = await api.listAdminKeys(meshId);
-			adminKeys = result || [];
+			adminKeys = Array.isArray(result) ? result : [];
 		} catch (err: any) {
 			console.error('Failed to load admin keys:', err);
 			adminKeys = [];
