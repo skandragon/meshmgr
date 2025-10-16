@@ -1,11 +1,52 @@
 <script lang="ts">
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { goto } from '$app/navigation';
+	import { api } from '$lib/api';
+	import { onMount } from 'svelte';
+
+	let meshes = $state<any[]>([]);
+	let loading = $state(false);
+	let showCreateModal = $state(false);
+	let meshName = $state('');
+	let meshDescription = $state('');
+	let error = $state('');
+
+	async function loadMeshes() {
+		if (!authStore.isAuthenticated) return;
+		loading = true;
+		try {
+			meshes = await api.listMeshes();
+		} catch (err: any) {
+			console.error('Failed to load meshes:', err);
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleCreateMesh(e: Event) {
+		e.preventDefault();
+		error = '';
+		try {
+			await api.createMesh(meshName, meshDescription || undefined);
+			showCreateModal = false;
+			meshName = '';
+			meshDescription = '';
+			await loadMeshes();
+		} catch (err: any) {
+			error = err.message || 'Failed to create mesh';
+		}
+	}
 
 	async function handleLogout() {
 		await authStore.logout();
 		goto('/login');
 	}
+
+	onMount(() => {
+		if (authStore.isAuthenticated) {
+			loadMeshes();
+		}
+	});
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -49,15 +90,85 @@
 		{:else if authStore.isAuthenticated}
 			<div class="px-4 py-6 sm:px-0">
 				<div class="bg-white shadow rounded-lg p-6">
-					<h2 class="text-2xl font-bold text-gray-900 mb-4">Welcome back!</h2>
-					<p class="text-gray-600">
-						You are logged in as <span class="font-semibold">{authStore.user?.email}</span>
-					</p>
-					<div class="mt-6">
-						<p class="text-gray-700">Your meshes will appear here soon.</p>
+					<div class="flex justify-between items-center mb-6">
+						<h2 class="text-2xl font-bold text-gray-900">My Meshes</h2>
+						<button
+							onclick={() => (showCreateModal = true)}
+							class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+						>
+							Create Mesh
+						</button>
 					</div>
+
+					{#if loading}
+						<p class="text-gray-500">Loading meshes...</p>
+					{:else if meshes.length === 0}
+						<p class="text-gray-600">No meshes yet. Create one to get started!</p>
+					{:else}
+						<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+							{#each meshes as mesh}
+								<a
+									href="/meshes/{mesh.id}"
+									class="block p-4 border rounded-lg hover:shadow-md transition-shadow"
+								>
+									<h3 class="text-lg font-semibold text-gray-900">{mesh.name}</h3>
+									{#if mesh.description}
+										<p class="text-sm text-gray-600 mt-1">{mesh.description}</p>
+									{/if}
+									<p class="text-xs text-gray-400 mt-2">
+										Created {new Date(mesh.created_at).toLocaleDateString()}
+									</p>
+								</a>
+							{/each}
+						</div>
+					{/if}
 				</div>
 			</div>
+
+			{#if showCreateModal}
+				<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+					<div class="bg-white rounded-lg p-6 max-w-md w-full">
+						<h3 class="text-lg font-bold mb-4">Create New Mesh</h3>
+						<form onsubmit={handleCreateMesh}>
+							<div class="mb-4">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+								<input
+									type="text"
+									bind:value={meshName}
+									required
+									class="w-full px-3 py-2 border border-gray-300 rounded-md"
+								/>
+							</div>
+							<div class="mb-4">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+								<textarea
+									bind:value={meshDescription}
+									class="w-full px-3 py-2 border border-gray-300 rounded-md"
+									rows="3"
+								></textarea>
+							</div>
+							{#if error}
+								<p class="text-red-600 text-sm mb-4">{error}</p>
+							{/if}
+							<div class="flex justify-end space-x-2">
+								<button
+									type="button"
+									onclick={() => (showCreateModal = false)}
+									class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+								>
+									Cancel
+								</button>
+								<button
+									type="submit"
+									class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
+								>
+									Create
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			{/if}
 		{:else}
 			<div class="px-4 py-6 sm:px-0">
 				<div class="bg-white shadow rounded-lg p-6 text-center">

@@ -137,6 +137,104 @@ class ApiClient {
 			method: 'DELETE',
 		});
 	}
+
+	// Mesh Access Management
+	async listMeshAccess(meshId: number) {
+		return this.request(`/api/meshes/${meshId}/access`);
+	}
+
+	async grantMeshAccess(meshId: number, userEmail: string, accessLevel: string) {
+		return this.request(`/api/meshes/${meshId}/access`, {
+			method: 'POST',
+			body: JSON.stringify({ user_email: userEmail, access_level: accessLevel }),
+		});
+	}
+
+	async updateMeshAccess(meshId: number, userId: number, accessLevel: string) {
+		return this.request(`/api/meshes/${meshId}/access/${userId}`, {
+			method: 'PUT',
+			body: JSON.stringify({ access_level: accessLevel }),
+		});
+	}
+
+	async revokeMeshAccess(meshId: number, userId: number) {
+		return this.request(`/api/meshes/${meshId}/access/${userId}`, {
+			method: 'DELETE',
+		});
+	}
+
+	// Admin Keys
+	async listAdminKeys(meshId: number) {
+		return this.request(`/api/meshes/${meshId}/admin-keys`);
+	}
+
+	async getAdminKey(meshId: number, keyId: number) {
+		return this.request(`/api/meshes/${meshId}/admin-keys/${keyId}`);
+	}
+
+	async createAdminKey(meshId: number, publicKey: string, keyName?: string) {
+		return this.request(`/api/meshes/${meshId}/admin-keys`, {
+			method: 'POST',
+			body: JSON.stringify({ public_key: publicKey, key_name: keyName }),
+		});
+	}
+
+	async deleteAdminKey(meshId: number, keyId: number) {
+		return this.request(`/api/meshes/${meshId}/admin-keys/${keyId}`, {
+			method: 'DELETE',
+		});
+	}
+
+	// Nodes
+	async listNodes(meshId: number) {
+		return this.request(`/api/meshes/${meshId}/nodes`);
+	}
+
+	async getNode(meshId: number, nodeId: number) {
+		return this.request(`/api/meshes/${meshId}/nodes/${nodeId}`);
+	}
+
+	async createNode(meshId: number, data: {
+		hardware_id: string;
+		name: string;
+		long_name: string;
+		role?: string;
+		public_key?: string;
+		private_key?: string;
+		status?: string;
+	}) {
+		return this.request(`/api/meshes/${meshId}/nodes`, {
+			method: 'POST',
+			body: JSON.stringify(data),
+		});
+	}
+
+	async updateNode(meshId: number, nodeId: number, data: {
+		name?: string;
+		long_name?: string;
+		role?: string;
+		public_key?: string;
+		private_key?: string;
+		status?: string;
+	}) {
+		return this.request(`/api/meshes/${meshId}/nodes/${nodeId}`, {
+			method: 'PUT',
+			body: JSON.stringify(data),
+		});
+	}
+
+	async updateNodeStatus(meshId: number, nodeId: number, status: string) {
+		return this.request(`/api/meshes/${meshId}/nodes/${nodeId}/status`, {
+			method: 'PATCH',
+			body: JSON.stringify({ status }),
+		});
+	}
+
+	async deleteNode(meshId: number, nodeId: number) {
+		return this.request(`/api/meshes/${meshId}/nodes/${nodeId}`, {
+			method: 'DELETE',
+		});
+	}
 }
 
 export const api = new ApiClient(API_BASE_URL);
