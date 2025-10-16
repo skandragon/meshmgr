@@ -147,8 +147,9 @@
 						<h3 class="text-lg font-bold mb-4">Create New Mesh</h3>
 						<form onsubmit={handleCreateMesh}>
 							<div class="mb-4">
-								<label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+								<label for="mesh-name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
 								<input
+									id="mesh-name"
 									type="text"
 									bind:value={meshName}
 									required
@@ -156,16 +157,18 @@
 								/>
 							</div>
 							<div class="mb-4">
-								<label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+								<label for="mesh-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
 								<textarea
+									id="mesh-description"
 									bind:value={meshDescription}
 									class="w-full px-3 py-2 border border-gray-300 rounded-md"
 									rows="3"
 								></textarea>
 							</div>
 							<div class="mb-4">
-								<label class="block text-sm font-medium text-gray-700 mb-1">LoRa Region</label>
+								<label for="mesh-lora-region" class="block text-sm font-medium text-gray-700 mb-1">LoRa Region</label>
 								<select
+									id="mesh-lora-region"
 									bind:value={loraRegion}
 									class="w-full px-3 py-2 border border-gray-300 rounded-md"
 								>
@@ -183,8 +186,9 @@
 								</select>
 							</div>
 							<div class="mb-4">
-								<label class="block text-sm font-medium text-gray-700 mb-1">Modem Preset</label>
+								<label for="mesh-modem-preset" class="block text-sm font-medium text-gray-700 mb-1">Modem Preset</label>
 								<select
+									id="mesh-modem-preset"
 									bind:value={modemPreset}
 									class="w-full px-3 py-2 border border-gray-300 rounded-md"
 								>
@@ -200,8 +204,9 @@
 								</select>
 							</div>
 							<div class="mb-4">
-								<label class="block text-sm font-medium text-gray-700 mb-1">Frequency Slot (0-7)</label>
+								<label for="mesh-frequency-slot" class="block text-sm font-medium text-gray-700 mb-1">Frequency Slot (0-7)</label>
 								<input
+									id="mesh-frequency-slot"
 									type="number"
 									bind:value={frequencySlot}
 									min="0"

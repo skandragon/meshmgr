@@ -426,8 +426,9 @@
 			<h3 class="text-lg font-bold mb-4">Add New Node</h3>
 			<form onsubmit={handleCreateNode}>
 				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">Hardware ID</label>
+					<label for="node-hardware-id" class="block text-sm font-medium text-gray-700 mb-1">Hardware ID</label>
 					<input
+						id="node-hardware-id"
 						type="text"
 						bind:value={nodeForm.hardware_id}
 						required
@@ -435,8 +436,9 @@
 					/>
 				</div>
 				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+					<label for="node-name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
 					<input
+						id="node-name"
 						type="text"
 						bind:value={nodeForm.name}
 						required
@@ -444,8 +446,9 @@
 					/>
 				</div>
 				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">Long Name</label>
+					<label for="node-long-name" class="block text-sm font-medium text-gray-700 mb-1">Long Name</label>
 					<input
+						id="node-long-name"
 						type="text"
 						bind:value={nodeForm.long_name}
 						required
@@ -453,8 +456,9 @@
 					/>
 				</div>
 				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">Role (optional)</label>
+					<label for="node-role" class="block text-sm font-medium text-gray-700 mb-1">Role (optional)</label>
 					<select
+						id="node-role"
 						bind:value={nodeForm.role}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md"
 					>
@@ -474,8 +478,9 @@
 					</select>
 				</div>
 				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">Status (optional)</label>
+					<label for="node-status" class="block text-sm font-medium text-gray-700 mb-1">Status (optional)</label>
 					<input
+						id="node-status"
 						type="text"
 						bind:value={nodeForm.status}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -521,8 +526,9 @@
 			<h3 class="text-lg font-bold mb-4">Add Admin Key</h3>
 			<form onsubmit={handleCreateKey}>
 				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1">Public Key</label>
+					<label for="key-public-key" class="block text-sm font-medium text-gray-700 mb-1">Public Key</label>
 					<textarea
+						id="key-public-key"
 						bind:value={keyForm.public_key}
 						required
 						rows="4"
@@ -530,10 +536,11 @@
 					></textarea>
 				</div>
 				<div class="mb-4">
-					<label class="block text-sm font-medium text-gray-700 mb-1"
+					<label for="key-name" class="block text-sm font-medium text-gray-700 mb-1"
 						>Key Name (optional)</label
 					>
 					<input
+						id="key-name"
 						type="text"
 						bind:value={keyForm.key_name}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md"
