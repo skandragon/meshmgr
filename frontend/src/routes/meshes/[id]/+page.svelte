@@ -50,9 +50,11 @@
 	async function loadNodes() {
 		nodesLoading = true;
 		try {
-			nodes = await api.listNodes(meshId);
+			const result = await api.listNodes(meshId);
+			nodes = result || [];
 		} catch (err: any) {
 			console.error('Failed to load nodes:', err);
+			nodes = [];
 		} finally {
 			nodesLoading = false;
 		}
@@ -84,9 +86,11 @@
 	async function loadAdminKeys() {
 		keysLoading = true;
 		try {
-			adminKeys = await api.listAdminKeys(meshId);
+			const result = await api.listAdminKeys(meshId);
+			adminKeys = result || [];
 		} catch (err: any) {
 			console.error('Failed to load admin keys:', err);
+			adminKeys = [];
 		} finally {
 			keysLoading = false;
 		}
@@ -118,9 +122,11 @@
 	async function loadAccess() {
 		accessLoading = true;
 		try {
-			accessList = await api.listMeshAccess(meshId);
+			const result = await api.listMeshAccess(meshId);
+			accessList = result || [];
 		} catch (err: any) {
 			console.error('Failed to load access list:', err);
+			accessList = [];
 		} finally {
 			accessLoading = false;
 		}
