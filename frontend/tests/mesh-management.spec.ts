@@ -81,7 +81,7 @@ test.describe('Mesh Management', () => {
 		await modal.locator('label:has-text("Hardware ID") + input').fill('!abc123');
 		await modal.locator('label:has-text("Name") + input').first().fill('test-node');
 		await modal.locator('label:has-text("Long Name") + input').fill('Test Node One');
-		await modal.locator('label:has-text("Role") + input').fill('CLIENT');
+		await modal.locator('label:has-text("Role") + select').selectOption('CLIENT');
 
 		// Submit
 		await modal.getByRole('button', { name: 'Add Node' }).click();

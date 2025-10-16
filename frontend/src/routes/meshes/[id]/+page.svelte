@@ -338,11 +338,24 @@
 				</div>
 				<div class="mb-4">
 					<label class="block text-sm font-medium text-gray-700 mb-1">Role (optional)</label>
-					<input
-						type="text"
+					<select
 						bind:value={nodeForm.role}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md"
-					/>
+					>
+						<option value="">Select a role...</option>
+						<option value="CLIENT">CLIENT - App connected or messaging device</option>
+						<option value="CLIENT_MUTE">CLIENT_MUTE - Does not forward packets</option>
+						<option value="CLIENT_HIDDEN">CLIENT_HIDDEN - Broadcasts only as needed</option>
+						<option value="CLIENT_BASE">CLIENT_BASE - Personal base station</option>
+						<option value="TRACKER">TRACKER - GPS position priority</option>
+						<option value="LOST_AND_FOUND">LOST_AND_FOUND - Device recovery broadcasts</option>
+						<option value="SENSOR">SENSOR - Telemetry priority</option>
+						<option value="TAK">TAK - ATAK system optimized</option>
+						<option value="TAK_TRACKER">TAK_TRACKER - TAK PLI broadcasts</option>
+						<option value="REPEATER">REPEATER - Network coverage extension</option>
+						<option value="ROUTER">ROUTER - Infrastructure node</option>
+						<option value="ROUTER_LATE">ROUTER_LATE - Delayed rebroadcast router</option>
+					</select>
 				</div>
 				<div class="mb-4">
 					<label class="block text-sm font-medium text-gray-700 mb-1">Status (optional)</label>
