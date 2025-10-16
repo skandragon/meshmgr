@@ -82,10 +82,17 @@ func Load() (*Config, error) {
 
 // ConnectionString returns a PostgreSQL connection string
 func (c *DatabaseConfig) ConnectionString() string {
-	return fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
+	connStr := fmt.Sprintf(
+		"host=%s port=%d user=%s dbname=%s sslmode=%s",
+		c.Host, c.Port, c.User, c.DBName, c.SSLMode,
 	)
+	if c.Password != "" {
+		connStr = fmt.Sprintf(
+			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+			c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
+		)
+	}
+	return connStr
 }
 
 // getEnv gets an environment variable or returns a default value

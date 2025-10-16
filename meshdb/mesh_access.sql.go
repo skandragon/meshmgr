@@ -8,8 +8,6 @@ package meshdb
 import (
 	"context"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const checkUserMeshAccess = `-- name: CheckUserMeshAccess :one
@@ -60,10 +58,10 @@ RETURNING id, mesh_id, user_id, access_level, granted_by, created_at
 `
 
 type GrantMeshAccessParams struct {
-	MeshID      int64       `json:"mesh_id"`
-	UserID      int64       `json:"user_id"`
-	AccessLevel string      `json:"access_level"`
-	GrantedBy   pgtype.Int8 `json:"granted_by"`
+	MeshID      int64  `json:"mesh_id"`
+	UserID      int64  `json:"user_id"`
+	AccessLevel string `json:"access_level"`
+	GrantedBy   *int64 `json:"granted_by"`
 }
 
 func (q *Queries) GrantMeshAccess(ctx context.Context, arg GrantMeshAccessParams) (MeshAccess, error) {
@@ -94,14 +92,14 @@ ORDER BY ma.created_at DESC
 `
 
 type ListMeshAccessByMeshRow struct {
-	ID          int64       `json:"id"`
-	MeshID      int64       `json:"mesh_id"`
-	UserID      int64       `json:"user_id"`
-	AccessLevel string      `json:"access_level"`
-	GrantedBy   pgtype.Int8 `json:"granted_by"`
-	CreatedAt   time.Time   `json:"created_at"`
-	Email       string      `json:"email"`
-	DisplayName string      `json:"display_name"`
+	ID          int64     `json:"id"`
+	MeshID      int64     `json:"mesh_id"`
+	UserID      int64     `json:"user_id"`
+	AccessLevel string    `json:"access_level"`
+	GrantedBy   *int64    `json:"granted_by"`
+	CreatedAt   time.Time `json:"created_at"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name"`
 }
 
 func (q *Queries) ListMeshAccessByMesh(ctx context.Context, meshID int64) ([]ListMeshAccessByMeshRow, error) {
@@ -142,13 +140,13 @@ ORDER BY ma.created_at DESC
 `
 
 type ListMeshAccessByUserRow struct {
-	ID          int64       `json:"id"`
-	MeshID      int64       `json:"mesh_id"`
-	UserID      int64       `json:"user_id"`
-	AccessLevel string      `json:"access_level"`
-	GrantedBy   pgtype.Int8 `json:"granted_by"`
-	CreatedAt   time.Time   `json:"created_at"`
-	MeshName    string      `json:"mesh_name"`
+	ID          int64     `json:"id"`
+	MeshID      int64     `json:"mesh_id"`
+	UserID      int64     `json:"user_id"`
+	AccessLevel string    `json:"access_level"`
+	GrantedBy   *int64    `json:"granted_by"`
+	CreatedAt   time.Time `json:"created_at"`
+	MeshName    string    `json:"mesh_name"`
 }
 
 func (q *Queries) ListMeshAccessByUser(ctx context.Context, userID int64) ([]ListMeshAccessByUserRow, error) {

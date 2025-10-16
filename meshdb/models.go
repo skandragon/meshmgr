@@ -6,8 +6,6 @@ package meshdb
 
 import (
 	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Mesh struct {
@@ -20,12 +18,12 @@ type Mesh struct {
 }
 
 type MeshAccess struct {
-	ID          int64       `json:"id"`
-	MeshID      int64       `json:"mesh_id"`
-	UserID      int64       `json:"user_id"`
-	AccessLevel string      `json:"access_level"`
-	GrantedBy   pgtype.Int8 `json:"granted_by"`
-	CreatedAt   time.Time   `json:"created_at"`
+	ID          int64     `json:"id"`
+	MeshID      int64     `json:"mesh_id"`
+	UserID      int64     `json:"user_id"`
+	AccessLevel string    `json:"access_level"`
+	GrantedBy   *int64    `json:"granted_by"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Session struct {

@@ -15,4 +15,5 @@ sql:
         overrides:
           - {db_type: "timestamptz", go_type: {import: "time", type: "Time"}}
           - {db_type: "timestamptz", nullable: true, go_type: {type: "*time.Time"}}
-          - {db_type: "bigint", nullable: true, go_type: {type: "*int64"}}
+          - {db_type: "text", nullable: true, go_type: {type: "*string"}}
+          - {db_type: "pg_catalog.int8", nullable: true, go_type: {type: "*int64"}}
