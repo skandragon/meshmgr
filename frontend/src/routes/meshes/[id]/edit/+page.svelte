@@ -454,7 +454,7 @@
 								<div class="flex justify-between items-center mb-4">
 									<div>
 										<h2 class="text-2xl font-bold text-gray-900">Admin Keys</h2>
-										<p class="text-gray-600 mt-1">Manage SSH public keys for device administration (maximum 3)</p>
+										<p class="text-gray-600 mt-1">Manage admin keys for device administration (maximum 3)</p>
 									</div>
 									<button
 										onclick={() => (showKeyModal = true)}
@@ -471,7 +471,7 @@
 									<div class="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
 										<p class="text-gray-600">No admin keys configured</p>
 										<p class="text-sm text-gray-500 mt-2">
-											Add SSH public keys to enable secure device administration
+											Add admin keys to enable secure device administration
 										</p>
 									</div>
 								{:else}
@@ -533,7 +533,7 @@
 						required
 						rows="4"
 						class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
-						placeholder="ssh-rsa AAAAB3NzaC..."
+						placeholder="Enter admin public key..."
 					></textarea>
 				</div>
 				<div class="mb-4">
