@@ -178,17 +178,28 @@
 
 	async function handleSaveKey(index: number) {
 		const slot = keySlots[index];
-		if (!slot.public_key.trim()) {
-			error = 'Public key cannot be empty';
-			return;
-		}
-
 		const keyLabel = index === 0 ? 'Primary' : index === 1 ? 'Secondary' : 'Tertiary';
+
 		keySlots[index].saving = true;
 		error = '';
 		successMessage = '';
 
 		try {
+			// If key is empty and slot has an ID, delete it
+			if (!slot.public_key.trim() && slot.id) {
+				await api.deleteAdminKey(meshId, slot.id);
+				keySlots[index] = { id: null, public_key: '', key_name: '', saving: false };
+				successMessage = `${keyLabel} key removed successfully`;
+				return;
+			}
+
+			// If key is empty and no ID, just clear the slot
+			if (!slot.public_key.trim()) {
+				keySlots[index] = { id: null, public_key: '', key_name: '', saving: false };
+				return;
+			}
+
+			// Save or update the key
 			if (slot.id) {
 				// Update existing key (delete and recreate)
 				await api.deleteAdminKey(meshId, slot.id);
@@ -200,28 +211,6 @@
 			error = err.message || `Failed to save ${keyLabel.toLowerCase()} key`;
 		} finally {
 			keySlots[index].saving = false;
-		}
-	}
-
-	async function handleDeleteKey(index: number) {
-		const slot = keySlots[index];
-		if (!slot.id) {
-			// Just clear the slot if no key exists
-			keySlots[index] = { id: null, public_key: '', key_name: '', saving: false };
-			return;
-		}
-
-		if (!confirm('Are you sure you want to delete this admin key?')) return;
-
-		const keyLabel = index === 0 ? 'Primary' : index === 1 ? 'Secondary' : 'Tertiary';
-		error = '';
-		successMessage = '';
-		try {
-			await api.deleteAdminKey(meshId, slot.id);
-			keySlots[index] = { id: null, public_key: '', key_name: '', saving: false };
-			successMessage = `${keyLabel} key deleted successfully`;
-		} catch (err: any) {
-			error = err.message || `Failed to delete ${keyLabel.toLowerCase()} key`;
 		}
 	}
 
@@ -516,20 +505,13 @@
 															/>
 														</div>
 													</div>
-													<div class="flex flex-col gap-2 pt-6">
+													<div class="pt-6">
 														<button
 															onclick={() => handleSaveKey(index)}
-															disabled={slot.saving || !slot.public_key.trim()}
+															disabled={slot.saving}
 															class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
 														>
 															{slot.saving ? 'Saving...' : 'Save'}
-														</button>
-														<button
-															onclick={() => handleDeleteKey(index)}
-															disabled={slot.saving}
-															class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-														>
-															Delete
 														</button>
 													</div>
 												</div>
