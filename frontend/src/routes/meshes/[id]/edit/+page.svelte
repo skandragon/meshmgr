@@ -214,6 +214,30 @@
 		}
 	}
 
+	async function handleDeleteMesh() {
+		const confirmed = confirm(
+			'Are you sure you want to delete this mesh?\n\n' +
+			'WARNING: This will permanently delete the mesh and ALL associated nodes. ' +
+			'This action cannot be undone.'
+		);
+
+		if (!confirmed) return;
+
+		const doubleCheck = confirm(
+			'This is your last chance to cancel.\n\n' +
+			'Type YES in the next dialog to confirm deletion.'
+		);
+
+		if (!doubleCheck) return;
+
+		try {
+			await api.deleteMesh(meshId);
+			goto('/');
+		} catch (err: any) {
+			error = err.message || 'Failed to delete mesh';
+		}
+	}
+
 	function changeSection(section: string) {
 		activeSection = section;
 		error = '';
@@ -304,6 +328,17 @@
 						>
 							Admin Keys
 						</button>
+						<div class="pt-2 mt-2 border-t border-gray-200">
+							<button
+								onclick={() => changeSection('danger')}
+								class="w-full text-left px-4 py-2 rounded-md text-sm font-medium {activeSection ===
+								'danger'
+									? 'bg-red-50 text-red-700'
+									: 'text-red-600 hover:bg-red-50'}"
+							>
+								Danger Zone
+							</button>
+						</div>
 					</nav>
 				</div>
 
@@ -519,6 +554,36 @@
 										{/each}
 									</div>
 								{/if}
+							</div>
+						{/if}
+
+						<!-- Danger Zone Section -->
+						{#if activeSection === 'danger'}
+							<div>
+								<h2 class="text-2xl font-bold text-red-700 mb-2">Danger Zone</h2>
+								<p class="text-gray-600 mb-6">Irreversible and destructive actions</p>
+
+								<div class="border-2 border-red-200 bg-red-50 rounded-lg p-6">
+									<div class="flex items-start gap-4">
+										<div class="flex-1">
+											<h3 class="text-lg font-semibold text-gray-900 mb-2">Delete this mesh</h3>
+											<p class="text-sm text-gray-700 mb-2">
+												Once you delete a mesh, there is no going back.
+											</p>
+											<p class="text-sm text-red-600 font-medium">
+												⚠️ This will permanently delete all nodes associated with this mesh.
+											</p>
+										</div>
+										<div>
+											<button
+												onclick={handleDeleteMesh}
+												class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium whitespace-nowrap"
+											>
+												Delete Mesh
+											</button>
+										</div>
+									</div>
+								</div>
 							</div>
 						{/if}
 					</div>
