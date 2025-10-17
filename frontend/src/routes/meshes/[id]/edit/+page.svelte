@@ -56,11 +56,13 @@
 
 	let loraConfig = $state<LoRaConfig | null>(null);
 
-	// Admin Keys
-	let adminKeys = $state<any[]>([]);
+	// Admin Keys - 3 fixed slots
+	let keySlots = $state<Array<{ id: number | null; public_key: string; key_name: string; saving: boolean }>>([
+		{ id: null, public_key: '', key_name: '', saving: false },
+		{ id: null, public_key: '', key_name: '', saving: false },
+		{ id: null, public_key: '', key_name: '', saving: false }
+	]);
 	let keysLoading = $state(false);
-	let showKeyModal = $state(false);
-	let keyForm = $state({ public_key: '', key_name: '' });
 
 	// Check if a preset is available for the selected region
 	function isPresetAvailable(presetCode: string): boolean {
@@ -160,40 +162,66 @@
 		keysLoading = true;
 		try {
 			const result = await api.listAdminKeys(meshId);
-			adminKeys = Array.isArray(result) ? result : [];
+			const keys = Array.isArray(result) ? result : [];
+			// Map keys to slots (max 3)
+			keySlots = [
+				keys[0] ? { id: keys[0].id, public_key: keys[0].public_key, key_name: keys[0].key_name || '', saving: false } : { id: null, public_key: '', key_name: '', saving: false },
+				keys[1] ? { id: keys[1].id, public_key: keys[1].public_key, key_name: keys[1].key_name || '', saving: false } : { id: null, public_key: '', key_name: '', saving: false },
+				keys[2] ? { id: keys[2].id, public_key: keys[2].public_key, key_name: keys[2].key_name || '', saving: false } : { id: null, public_key: '', key_name: '', saving: false }
+			];
 		} catch (err: any) {
 			console.error('Failed to load admin keys:', err);
-			adminKeys = [];
 		} finally {
 			keysLoading = false;
 		}
 	}
 
-	async function handleCreateKey(e: Event) {
-		e.preventDefault();
+	async function handleSaveKey(index: number) {
+		const slot = keySlots[index];
+		if (!slot.public_key.trim()) {
+			error = 'Public key cannot be empty';
+			return;
+		}
+
+		const keyLabel = index === 0 ? 'Primary' : index === 1 ? 'Secondary' : 'Tertiary';
+		keySlots[index].saving = true;
 		error = '';
 		successMessage = '';
+
 		try {
-			await api.createAdminKey(meshId, keyForm.public_key, keyForm.key_name || undefined);
-			showKeyModal = false;
-			keyForm = { public_key: '', key_name: '' };
-			successMessage = 'Admin key added successfully';
-			await loadAdminKeys();
+			if (slot.id) {
+				// Update existing key (delete and recreate)
+				await api.deleteAdminKey(meshId, slot.id);
+			}
+			const newKey = await api.createAdminKey(meshId, slot.public_key, slot.key_name || undefined);
+			keySlots[index] = { id: newKey.id, public_key: slot.public_key, key_name: slot.key_name, saving: false };
+			successMessage = `${keyLabel} key saved successfully`;
 		} catch (err: any) {
-			error = err.message || 'Failed to create admin key';
+			error = err.message || `Failed to save ${keyLabel.toLowerCase()} key`;
+		} finally {
+			keySlots[index].saving = false;
 		}
 	}
 
-	async function handleDeleteKey(keyId: number) {
+	async function handleDeleteKey(index: number) {
+		const slot = keySlots[index];
+		if (!slot.id) {
+			// Just clear the slot if no key exists
+			keySlots[index] = { id: null, public_key: '', key_name: '', saving: false };
+			return;
+		}
+
 		if (!confirm('Are you sure you want to delete this admin key?')) return;
+
+		const keyLabel = index === 0 ? 'Primary' : index === 1 ? 'Secondary' : 'Tertiary';
 		error = '';
 		successMessage = '';
 		try {
-			await api.deleteAdminKey(meshId, keyId);
-			successMessage = 'Admin key deleted successfully';
-			await loadAdminKeys();
+			await api.deleteAdminKey(meshId, slot.id);
+			keySlots[index] = { id: null, public_key: '', key_name: '', saving: false };
+			successMessage = `${keyLabel} key deleted successfully`;
 		} catch (err: any) {
-			error = err.message || 'Failed to delete admin key';
+			error = err.message || `Failed to delete ${keyLabel.toLowerCase()} key`;
 		}
 	}
 
@@ -201,7 +229,7 @@
 		activeSection = section;
 		error = '';
 		successMessage = '';
-		if (section === 'keys' && adminKeys.length === 0) loadAdminKeys();
+		if (section === 'keys') loadAdminKeys();
 	}
 
 	onMount(() => {
@@ -451,51 +479,59 @@
 						<!-- Admin Keys Section -->
 						{#if activeSection === 'keys'}
 							<div>
-								<div class="flex justify-between items-center mb-4">
-									<div>
-										<h2 class="text-2xl font-bold text-gray-900">Admin Keys</h2>
-										<p class="text-gray-600 mt-1">Manage admin keys for device administration (maximum 3)</p>
-									</div>
-									<button
-										onclick={() => (showKeyModal = true)}
-										disabled={adminKeys.length >= 3}
-										class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-									>
-										Add Key
-									</button>
-								</div>
+								<h2 class="text-2xl font-bold text-gray-900 mb-2">Admin Keys</h2>
+								<p class="text-gray-600 mb-6">Configure up to 3 admin keys for device administration</p>
 
 								{#if keysLoading}
 									<p class="text-gray-500">Loading admin keys...</p>
-								{:else if adminKeys.length === 0}
-									<div class="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-										<p class="text-gray-600">No admin keys configured</p>
-										<p class="text-sm text-gray-500 mt-2">
-											Add admin keys to enable secure device administration
-										</p>
-									</div>
 								{:else}
 									<div class="space-y-4">
-										{#each adminKeys as key}
+										{#each keySlots as slot, index}
+											{@const keyLabel = index === 0 ? 'Primary' : index === 1 ? 'Secondary' : 'Tertiary'}
 											<div class="border rounded-lg p-4">
-												<div class="flex justify-between items-start">
-													<div class="flex-1">
-														<h3 class="font-medium text-gray-900">
-															{key.key_name || 'Unnamed Key'}
-														</h3>
-														<p class="text-sm text-gray-500 font-mono mt-2 break-all">
-															{key.public_key}
-														</p>
-														<p class="text-xs text-gray-400 mt-2">
-															Added {new Date(key.created_at).toLocaleDateString()}
-														</p>
+												<div class="flex items-start gap-4">
+													<div class="flex-1 space-y-3">
+														<div>
+															<label for="key-name-{index}" class="block text-sm font-medium text-gray-700 mb-1">
+																{keyLabel} Key Name (optional)
+															</label>
+															<input
+																id="key-name-{index}"
+																type="text"
+																bind:value={slot.key_name}
+																class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+																placeholder="e.g., Main Admin Key"
+															/>
+														</div>
+														<div>
+															<label for="key-value-{index}" class="block text-sm font-medium text-gray-700 mb-1">
+																Public Key
+															</label>
+															<input
+																id="key-value-{index}"
+																type="text"
+																bind:value={slot.public_key}
+																class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm"
+																placeholder="Enter admin public key..."
+															/>
+														</div>
 													</div>
-													<button
-														onclick={() => handleDeleteKey(key.id)}
-														class="text-red-600 hover:text-red-900 ml-4 text-sm"
-													>
-														Delete
-													</button>
+													<div class="flex flex-col gap-2 pt-6">
+														<button
+															onclick={() => handleSaveKey(index)}
+															disabled={slot.saving || !slot.public_key.trim()}
+															class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+														>
+															{slot.saving ? 'Saving...' : 'Save'}
+														</button>
+														<button
+															onclick={() => handleDeleteKey(index)}
+															disabled={slot.saving}
+															class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+														>
+															Delete
+														</button>
+													</div>
 												</div>
 											</div>
 										{/each}
@@ -513,57 +549,3 @@
 		</div>
 	{/if}
 </div>
-
-<!-- Admin Key Modal -->
-{#if showKeyModal}
-	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-		<div class="bg-white rounded-lg p-6 max-w-md w-full">
-			<h3 class="text-lg font-bold mb-4">Add Admin Key</h3>
-			<form onsubmit={handleCreateKey}>
-				<div class="mb-4">
-					<label
-						for="key-public-key"
-						class="block text-sm font-medium text-gray-700 mb-1"
-					>
-						Public Key <span class="text-red-500">*</span>
-					</label>
-					<textarea
-						id="key-public-key"
-						bind:value={keyForm.public_key}
-						required
-						rows="4"
-						class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
-						placeholder="Enter admin public key..."
-					></textarea>
-				</div>
-				<div class="mb-4">
-					<label for="key-name" class="block text-sm font-medium text-gray-700 mb-1">
-						Key Name
-					</label>
-					<input
-						id="key-name"
-						type="text"
-						bind:value={keyForm.key_name}
-						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-						placeholder="My Laptop (optional)"
-					/>
-				</div>
-				<div class="flex justify-end space-x-2">
-					<button
-						type="button"
-						onclick={() => (showKeyModal = false)}
-						class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
-					>
-						Add Key
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}
