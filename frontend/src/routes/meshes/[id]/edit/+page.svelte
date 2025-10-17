@@ -223,12 +223,17 @@
 
 		if (!confirmed) return;
 
-		const doubleCheck = confirm(
+		const verification = prompt(
 			'This is your last chance to cancel.\n\n' +
-			'Type YES in the next dialog to confirm deletion.'
+			'Type DELETE to confirm deletion of this mesh and all its nodes:'
 		);
 
-		if (!doubleCheck) return;
+		if (verification !== 'DELETE') {
+			if (verification !== null) {
+				alert('Deletion cancelled. You must type DELETE exactly to confirm.');
+			}
+			return;
+		}
 
 		try {
 			await api.deleteMesh(meshId);
