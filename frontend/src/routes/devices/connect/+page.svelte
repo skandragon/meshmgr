@@ -1,15 +1,14 @@
 <script lang="ts">
-	import { serialStore } from '$lib/stores/serial.svelte';
+	import { meshtasticStore } from '$lib/stores/meshtastic.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 
-	let baudRate = $state(115200);
 	let connecting = $state(false);
 	let testMessage = $state('');
 
 	async function handleConnect() {
 		connecting = true;
 		try {
-			await serialStore.connect(baudRate);
+			await meshtasticStore.connect();
 		} catch (err) {
 			console.error('Connection failed:', err);
 		} finally {
@@ -19,7 +18,7 @@
 
 	async function handleDisconnect() {
 		try {
-			await serialStore.disconnect();
+			await meshtasticStore.disconnect();
 		} catch (err) {
 			console.error('Disconnect failed:', err);
 		}
@@ -28,7 +27,7 @@
 	async function handleSendTest() {
 		if (!testMessage.trim()) return;
 		try {
-			await serialStore.write(testMessage + '\n');
+			await meshtasticStore.sendMessage(testMessage);
 			testMessage = '';
 		} catch (err) {
 			console.error('Send failed:', err);
@@ -65,7 +64,7 @@
 
 			<div class="p-6 space-y-6">
 				<!-- Browser Support Check -->
-				{#if !serialStore.isSupported}
+				{#if !meshtasticStore.isSupported}
 					<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
 						<div class="flex">
 							<div class="flex-shrink-0">
@@ -99,16 +98,14 @@
 							<div>
 								<h3 class="text-lg font-semibold text-gray-900">Connection Status</h3>
 								<p class="text-sm text-gray-600 mt-1">
-									{#if serialStore.isConnected}
+									{#if meshtasticStore.isConnected}
 										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
 											Connected
 										</span>
-										{#if serialStore.deviceInfo}
-											<span class="ml-2 text-gray-500">
-												VID: 0x{serialStore.deviceInfo.vendorId?.toString(16).toUpperCase() ?? '????'}
-												PID: 0x{serialStore.deviceInfo.productId?.toString(16).toUpperCase() ?? '????'}
-											</span>
-										{/if}
+									{:else if meshtasticStore.isConnecting}
+										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+											Connecting...
+										</span>
 									{:else}
 										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
 											Disconnected
@@ -117,7 +114,7 @@
 								</p>
 							</div>
 							<div>
-								{#if serialStore.isConnected}
+								{#if meshtasticStore.isConnected}
 									<button
 										onclick={handleDisconnect}
 										class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium"
@@ -138,7 +135,7 @@
 					</div>
 
 					<!-- Error Display -->
-					{#if serialStore.error}
+					{#if meshtasticStore.error}
 						<div class="bg-red-50 border border-red-200 rounded-lg p-4">
 							<div class="flex">
 								<div class="flex-shrink-0">
@@ -157,48 +154,64 @@
 								<div class="ml-3">
 									<h3 class="text-sm font-medium text-red-800">Error</h3>
 									<div class="mt-2 text-sm text-red-700">
-										<p>{serialStore.error}</p>
+										<p>{meshtasticStore.error}</p>
 									</div>
 								</div>
 							</div>
 						</div>
 					{/if}
 
-					<!-- Connection Settings -->
-					{#if !serialStore.isConnected}
+					<!-- Device Information (when connected) -->
+					{#if meshtasticStore.isConnected && meshtasticStore.deviceInfo}
 						<div class="bg-white border rounded-lg p-4">
-							<h3 class="text-lg font-semibold text-gray-900 mb-4">Connection Settings</h3>
-							<div class="space-y-4">
+							<h3 class="text-lg font-semibold text-gray-900 mb-4">Device Information</h3>
+							<div class="grid grid-cols-2 gap-4">
+								{#if meshtasticStore.deviceInfo.firmwareVersion}
+									<div>
+										<p class="text-sm font-medium text-gray-500">Firmware Version</p>
+										<p class="text-sm text-gray-900">{meshtasticStore.deviceInfo.firmwareVersion}</p>
+									</div>
+								{/if}
+								{#if meshtasticStore.deviceInfo.hwModel}
+									<div>
+										<p class="text-sm font-medium text-gray-500">Hardware Model</p>
+										<p class="text-sm text-gray-900">{meshtasticStore.deviceInfo.hwModel}</p>
+									</div>
+								{/if}
+								{#if meshtasticStore.deviceInfo.myNodeNum}
+									<div>
+										<p class="text-sm font-medium text-gray-500">Node Number</p>
+										<p class="text-sm text-gray-900">{meshtasticStore.deviceInfo.myNodeNum}</p>
+									</div>
+								{/if}
+								{#if meshtasticStore.deviceInfo.region}
+									<div>
+										<p class="text-sm font-medium text-gray-500">LoRa Region</p>
+										<p class="text-sm text-gray-900">{meshtasticStore.deviceInfo.region}</p>
+									</div>
+								{/if}
+								{#if meshtasticStore.deviceInfo.modemPreset}
+									<div>
+										<p class="text-sm font-medium text-gray-500">Modem Preset</p>
+										<p class="text-sm text-gray-900">{meshtasticStore.deviceInfo.modemPreset}</p>
+									</div>
+								{/if}
 								<div>
-									<label for="baud-rate" class="block text-sm font-medium text-gray-700 mb-1">
-										Baud Rate
-									</label>
-									<select
-										id="baud-rate"
-										bind:value={baudRate}
-										class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-									>
-										<option value={9600}>9600</option>
-										<option value={19200}>19200</option>
-										<option value={38400}>38400</option>
-										<option value={57600}>57600</option>
-										<option value={115200}>115200 (Default for Meshtastic)</option>
-										<option value={230400}>230400</option>
-										<option value={460800}>460800</option>
-										<option value={921600}>921600</option>
-									</select>
-									<p class="text-sm text-gray-500 mt-1">
-										Meshtastic devices typically use 115200 baud
-									</p>
+									<p class="text-sm font-medium text-gray-500">WiFi</p>
+									<p class="text-sm text-gray-900">{meshtasticStore.deviceInfo.hasWifi ? 'Yes' : 'No'}</p>
+								</div>
+								<div>
+									<p class="text-sm font-medium text-gray-500">Bluetooth</p>
+									<p class="text-sm text-gray-900">{meshtasticStore.deviceInfo.hasBluetooth ? 'Yes' : 'No'}</p>
 								</div>
 							</div>
 						</div>
 					{/if}
 
-					<!-- Serial Monitor (when connected) -->
-					{#if serialStore.isConnected}
+					<!-- Messaging (when connected) -->
+					{#if meshtasticStore.isConnected}
 						<div class="bg-white border rounded-lg p-4">
-							<h3 class="text-lg font-semibold text-gray-900 mb-4">Serial Monitor</h3>
+							<h3 class="text-lg font-semibold text-gray-900 mb-4">Send Message</h3>
 
 							<!-- Send Message -->
 							<div class="mb-4">
@@ -206,7 +219,7 @@
 									<input
 										type="text"
 										bind:value={testMessage}
-										placeholder="Type a message to send..."
+										placeholder="Type a message to send to the mesh..."
 										onkeydown={(e) => e.key === 'Enter' && handleSendTest()}
 										class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
 									/>
@@ -219,25 +232,22 @@
 									</button>
 								</div>
 								<p class="text-sm text-gray-500 mt-1">
-									Press Enter or click Send to transmit
+									Press Enter or click Send to transmit to the mesh network
 								</p>
 							</div>
 
 							<!-- Last Received Message -->
 							<div>
 								<label class="block text-sm font-medium text-gray-700 mb-2">
-									Last Received:
+									Last Received Message:
 								</label>
 								<div class="bg-gray-900 text-green-400 font-mono text-sm p-4 rounded-md min-h-[100px] max-h-[300px] overflow-y-auto">
-									{#if serialStore.lastMessage}
-										<pre class="whitespace-pre-wrap break-words">{serialStore.lastMessage}</pre>
+									{#if meshtasticStore.lastMessage}
+										<pre class="whitespace-pre-wrap break-words">{meshtasticStore.lastMessage}</pre>
 									{:else}
-										<span class="text-gray-500">No data received yet...</span>
+										<span class="text-gray-500">No messages received yet...</span>
 									{/if}
 								</div>
-								<p class="text-sm text-gray-500 mt-1">
-									Reading: {serialStore.isReading ? 'Active' : 'Inactive'}
-								</p>
 							</div>
 						</div>
 					{/if}
@@ -248,8 +258,9 @@
 						<ol class="list-decimal list-inside space-y-1 text-sm text-blue-700">
 							<li>Connect your Meshtastic device to your computer via USB</li>
 							<li>Click "Connect Device" and select your device from the browser dialog</li>
-							<li>Once connected, you can send commands and view received data</li>
-							<li>Use the serial monitor to test communication with your device</li>
+							<li>Wait for device information to load (may take a few seconds)</li>
+							<li>Send messages to the mesh network using the messaging interface</li>
+							<li>Monitor received messages in the message display</li>
 						</ol>
 					</div>
 				{/if}
