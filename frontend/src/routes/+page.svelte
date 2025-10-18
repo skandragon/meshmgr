@@ -145,9 +145,15 @@
 						<h1 class="text-xl font-bold text-gray-900">Meshtastic Manager</h1>
 					</div>
 				</div>
-				<div class="flex items-center">
+				<div class="flex items-center gap-2">
 					{#if authStore.isAuthenticated}
-						<span class="text-sm text-gray-700 mr-4">
+						<a
+							href="/devices/connect"
+							class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+						>
+							Connect Device
+						</a>
+						<span class="text-sm text-gray-700 mr-2">
 							{authStore.user?.display_name}
 						</span>
 						<button
