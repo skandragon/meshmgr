@@ -1,7 +1,6 @@
 // Meshtastic client store using Svelte 5 runes
-import { Client } from '@meshtastic/core';
-import { ISerialConnection } from '@meshtastic/transport-web-serial';
-import type { Protobuf } from '@meshtastic/protobufs';
+import { MeshDevice, Protobuf, Types } from '@meshtastic/core';
+import { TransportWebSerial } from '@meshtastic/transport-web-serial';
 
 export interface DeviceInfo {
 	myNodeNum?: number;
@@ -9,26 +8,12 @@ export interface DeviceInfo {
 	hwModel?: string;
 	hasWifi?: boolean;
 	hasBluetooth?: boolean;
-	macAddress?: string;
 	region?: string;
 	modemPreset?: string;
-	numOnlineLocalNodes?: number;
-}
-
-export interface MeshtasticState {
-	isSupported: boolean;
-	client: Client | null;
-	connection: ISerialConnection | null;
-	isConnected: boolean;
-	isConnecting: boolean;
-	error: string | null;
-	deviceInfo: DeviceInfo | null;
-	lastMessage: string | null;
 }
 
 class MeshtasticStore {
-	private client = $state<Client | null>(null);
-	private connection = $state<ISerialConnection | null>(null);
+	private device = $state<MeshDevice | null>(null);
 
 	isSupported = $state(false);
 	isConnected = $state(false);
@@ -58,33 +43,21 @@ class MeshtasticStore {
 			this.isConnecting = true;
 			this.error = null;
 
-			// Create a new client
-			this.client = new Client();
+			// Create transport (prompts user for device selection)
+			const transport = await TransportWebSerial.create(115200);
 
-			// Create a serial connection
-			this.connection = new ISerialConnection();
+			// Create device with transport
+			this.device = new MeshDevice(transport);
 
 			// Set up event listeners
 			this.setupEventListeners();
 
-			// Connect to the device
-			await this.connection.connect({
-				baudRate: 115200,
-				concurrentLogOutput: false
-			});
-
-			// Connect the client to the connection
-			await this.client.connect({
-				connection: this.connection
-			});
-
 			this.isConnected = true;
-
-			// Request device info
-			await this.requestDeviceInfo();
+			console.log('[Meshtastic] Connected to device');
 		} catch (err: any) {
 			this.error = err.message || 'Failed to connect to Meshtastic device';
 			this.isConnected = false;
+			this.device = null;
 			throw err;
 		} finally {
 			this.isConnecting = false;
@@ -95,19 +68,16 @@ class MeshtasticStore {
 		try {
 			this.error = null;
 
-			if (this.client) {
-				this.client.disconnect();
-				this.client = null;
-			}
-
-			if (this.connection) {
-				await this.connection.disconnect();
-				this.connection = null;
+			if (this.device) {
+				// The device/transport will handle cleanup
+				this.device = null;
 			}
 
 			this.isConnected = false;
 			this.deviceInfo = null;
 			this.lastMessage = null;
+
+			console.log('[Meshtastic] Disconnected');
 		} catch (err: any) {
 			this.error = err.message || 'Failed to disconnect from Meshtastic device';
 			throw err;
@@ -115,131 +85,73 @@ class MeshtasticStore {
 	}
 
 	private setupEventListeners(): void {
-		if (!this.client) return;
+		if (!this.device) return;
 
-		// Listen for device metadata updates (includes myNodeInfo)
-		this.client.on('myNodeInfo', (myNodeInfo: Protobuf.Mesh.MyNodeInfo) => {
-			console.log('[Meshtastic] My Node Info:', myNodeInfo);
+		const events = this.device.events;
+
+		// Listen for device metadata
+		events.onDeviceMetadataPacket.subscribe((metadata) => {
+			console.log('[Meshtastic] Device Metadata:', metadata.data);
+			const data = metadata.data;
 			this.deviceInfo = {
 				...this.deviceInfo,
-				myNodeNum: myNodeInfo.myNodeNum
+				firmwareVersion: data.firmwareVersion,
+				hwModel: data.hwModel ? Protobuf.Mesh.HardwareModel[data.hwModel] : undefined,
+				hasWifi: data.hasWifi,
+				hasBluetooth: data.hasBluetooth
 			};
 		});
 
-		// Listen for device metadata updates
-		this.client.on('deviceMetadata', (metadata: Protobuf.Mesh.DeviceMetadata) => {
-			console.log('[Meshtastic] Device Metadata:', metadata);
+		// Listen for my node info
+		events.onMyNodeInfo.subscribe((info) => {
+			console.log('[Meshtastic] My Node Info:', info);
 			this.deviceInfo = {
 				...this.deviceInfo,
-				firmwareVersion: metadata.firmwareVersion,
-				hwModel: Protobuf.Mesh.HardwareModel[metadata.hwModel || 0],
-				hasWifi: metadata.hasWifi,
-				hasBluetooth: metadata.hasBluetooth
+				myNodeNum: info.myNodeNum
 			};
 		});
 
 		// Listen for config updates
-		this.client.on('config', (config: Protobuf.LocalConfig.LocalConfig) => {
-			console.log('[Meshtastic] Config:', config);
-			if (config.lora) {
+		events.onConfigPacket.subscribe((config) => {
+			console.log('[Meshtastic] Config:', config.data);
+			const data = config.data;
+
+			if (data.payloadVariant.case === 'lora' && data.payloadVariant.value) {
+				const lora = data.payloadVariant.value;
 				this.deviceInfo = {
 					...this.deviceInfo,
-					region: Protobuf.Config.Config_LoRaConfig_RegionCode[config.lora.region || 0],
-					modemPreset: Protobuf.Config.Config_LoRaConfig_ModemPreset[config.lora.modemPreset || 0]
+					region: lora.region ? Protobuf.Config.Config_LoRaConfig_RegionCode[lora.region] : undefined,
+					modemPreset: lora.modemPreset ? Protobuf.Config.Config_LoRaConfig_ModemPreset[lora.modemPreset] : undefined
 				};
 			}
 		});
 
-		// Listen for node info updates
-		this.client.on('nodeInfo', (nodeInfo: Protobuf.Mesh.NodeInfo) => {
-			console.log('[Meshtastic] Node Info:', nodeInfo);
-		});
-
 		// Listen for text messages
-		this.client.on('messagePacket', (packet: Protobuf.Mesh.MeshPacket) => {
+		events.onMessagePacket.subscribe((packet) => {
 			console.log('[Meshtastic] Message Packet:', packet);
-			if (packet.decoded?.portnum === Protobuf.Portnums.PortNum.TEXT_MESSAGE_APP) {
+			if (packet.data.decoded?.portnum === Protobuf.Portnums.PortNum.TEXT_MESSAGE_APP) {
 				const textDecoder = new TextDecoder();
-				const text = textDecoder.decode(packet.decoded.payload);
+				const text = textDecoder.decode(packet.data.decoded.payload);
 				this.lastMessage = text;
 				console.log('[Meshtastic] Text Message:', text);
 			}
 		});
 
-		// Listen for connection state changes
-		this.connection?.on('connectionStatus', (status: any) => {
-			console.log('[Meshtastic] Connection Status:', status);
+		// Listen for connection status
+		events.onDeviceStatus.subscribe((status) => {
+			console.log('[Meshtastic] Device Status:', status);
 		});
 	}
 
-	private async requestDeviceInfo(): Promise<void> {
-		if (!this.client) return;
-
-		try {
-			// Request my node info
-			await this.client.sendPacket(
-				Protobuf.Mesh.MeshPacket.toBinary({
-					decoded: {
-						portnum: Protobuf.Portnums.PortNum.ADMIN_APP,
-						payload: Protobuf.Admin.AdminMessage.toBinary({
-							getOwnerRequest: true
-						}),
-						wantResponse: true
-					}
-				})
-			);
-
-			// Request device metadata
-			await this.client.sendPacket(
-				Protobuf.Mesh.MeshPacket.toBinary({
-					decoded: {
-						portnum: Protobuf.Portnums.PortNum.ADMIN_APP,
-						payload: Protobuf.Admin.AdminMessage.toBinary({
-							getDeviceMetadataRequest: true
-						}),
-						wantResponse: true
-					}
-				})
-			);
-
-			// Request config
-			await this.client.sendPacket(
-				Protobuf.Mesh.MeshPacket.toBinary({
-					decoded: {
-						portnum: Protobuf.Portnums.PortNum.ADMIN_APP,
-						payload: Protobuf.Admin.AdminMessage.toBinary({
-							getConfigRequest: Protobuf.Admin.AdminMessage_GetConfigRequest_ConfigType.LORA_CONFIG
-						}),
-						wantResponse: true
-					}
-				})
-			);
-		} catch (err: any) {
-			console.error('[Meshtastic] Failed to request device info:', err);
-			this.error = err.message || 'Failed to request device information';
-		}
-	}
-
 	async sendMessage(text: string, channelIndex: number = 0): Promise<void> {
-		if (!this.client || !this.isConnected) {
+		if (!this.device || !this.isConnected) {
 			throw new Error('Not connected to a Meshtastic device');
 		}
 
 		try {
 			this.error = null;
-			const encoder = new TextEncoder();
-			const payload = encoder.encode(text);
 
-			await this.client.sendPacket(
-				Protobuf.Mesh.MeshPacket.toBinary({
-					decoded: {
-						portnum: Protobuf.Portnums.PortNum.TEXT_MESSAGE_APP,
-						payload
-					},
-					channel: channelIndex
-				})
-			);
-
+			await this.device.sendText(text);
 			console.log('[Meshtastic] Sent message:', text);
 		} catch (err: any) {
 			this.error = err.message || 'Failed to send message';
