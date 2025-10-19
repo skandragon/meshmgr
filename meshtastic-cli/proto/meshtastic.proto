@@ -1,0 +1,58 @@
+// Copyright (C) 2025 Michael Graff
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+syntax = "proto3";
+
+package meshtastic;
+
+option go_package = "github.com/skandragon/meshmgr/meshtastic-cli";
+
+// Message sent from client to radio
+message ToRadio {
+  oneof payload {
+    uint32 want_config_id = 3;  // Request config with this ID
+    bool disconnect = 4;        // Disconnect from radio
+  }
+}
+
+// Message sent from radio to client
+message FromRadio {
+  uint32 id = 1;                // Packet ID
+  oneof payload {
+    MyNodeInfo my_info = 3;     // Node information
+    NodeInfo node_info = 4;     // Node database entry
+    uint32 config_complete_id = 6;  // Config complete confirmation
+    string log_record = 10;     // Debug log output
+  }
+}
+
+// Basic node information
+message MyNodeInfo {
+  uint32 my_node_num = 1;      // Node number
+  bool has_gps = 2;             // GPS availability
+  string firmware_version = 6;  // Firmware version
+}
+
+// Node database entry
+message NodeInfo {
+  uint32 num = 1;               // Node number
+  User user = 2;                // User information
+}
+
+// User information
+message User {
+  string id = 1;                // User ID (hardware ID)
+  string long_name = 2;         // Long name
+  string short_name = 3;        // Short name
+}
