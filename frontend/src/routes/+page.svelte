@@ -160,6 +160,22 @@
 					<div class="flex-shrink-0 flex items-center">
 						<h1 class="text-xl font-bold text-gray-900">Meshtastic Manager</h1>
 					</div>
+					{#if authStore.isAuthenticated}
+						<div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+							<a
+								href="/"
+								class="inline-flex items-center px-1 pt-1 border-b-2 border-blue-500 text-sm font-medium text-gray-900"
+							>
+								Meshes
+							</a>
+							<a
+								href="/api-keys"
+								class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900"
+							>
+								API Keys
+							</a>
+						</div>
+					{/if}
 				</div>
 				<div class="flex items-center gap-2">
 					{#if authStore.isAuthenticated}

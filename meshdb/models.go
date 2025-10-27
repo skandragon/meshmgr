@@ -13,22 +13,27 @@ import (
 type AdminKey struct {
 	ID        int64     `json:"id"`
 	MeshID    int64     `json:"mesh_id"`
-	PublicKey string    `json:"public_key"`
+	PublicKey []byte    `json:"public_key"`
 	KeyName   *string   `json:"key_name"`
 	AddedBy   int64     `json:"added_by"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 type Mesh struct {
-	ID            int64       `json:"id"`
-	OwnerID       int64       `json:"owner_id"`
-	Name          string      `json:"name"`
-	Description   *string     `json:"description"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
-	LoraRegion    *string     `json:"lora_region"`
-	ModemPreset   *string     `json:"modem_preset"`
-	FrequencySlot pgtype.Int4 `json:"frequency_slot"`
+	ID             int64       `json:"id"`
+	OwnerID        int64       `json:"owner_id"`
+	Name           string      `json:"name"`
+	Description    *string     `json:"description"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+	LoraRegion     *string     `json:"lora_region"`
+	ModemPreset    *string     `json:"modem_preset"`
+	FrequencySlot  pgtype.Int4 `json:"frequency_slot"`
+	HopLimit       pgtype.Int4 `json:"hop_limit"`
+	TxPower        pgtype.Int4 `json:"tx_power"`
+	ChannelNum     pgtype.Int4 `json:"channel_num"`
+	UsePreset      bool        `json:"use_preset"`
+	ConfigDefaults []byte      `json:"config_defaults"`
 }
 
 type MeshAccess struct {
@@ -38,6 +43,18 @@ type MeshAccess struct {
 	AccessLevel string    `json:"access_level"`
 	GrantedBy   *int64    `json:"granted_by"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type MeshChannel struct {
+	ID           int64     `json:"id"`
+	MeshID       int64     `json:"mesh_id"`
+	ChannelIndex int32     `json:"channel_index"`
+	ChannelRole  string    `json:"channel_role"`
+	Psk          []byte    `json:"psk"`
+	ChannelName  *string   `json:"channel_name"`
+	Settings     []byte    `json:"settings"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type Node struct {
@@ -62,6 +79,14 @@ type Node struct {
 	Unmessageable        bool        `json:"unmessageable"`
 	ConfigAppliedAt      *time.Time  `json:"config_applied_at"`
 	PendingChanges       bool        `json:"pending_changes"`
+	NodeNum              *int64      `json:"node_num"`
+	DeviceID             []byte      `json:"device_id"`
+	FirmwareVersion      *string     `json:"firmware_version"`
+	HwModel              pgtype.Int4 `json:"hw_model"`
+	ShortName            *string     `json:"short_name"`
+	RawDeviceConfig      []byte      `json:"raw_device_config"`
+	ConfigOverrides      []byte      `json:"config_overrides"`
+	ConfigImportedAt     *time.Time  `json:"config_imported_at"`
 }
 
 type NodeAdminKey struct {
@@ -87,4 +112,14 @@ type User struct {
 	DisplayName  string    `json:"display_name"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type UserApiKey struct {
+	ID         int64      `json:"id"`
+	UserID     int64      `json:"user_id"`
+	KeyHash    string     `json:"key_hash"`
+	KeyName    string     `json:"key_name"`
+	ExpiresAt  *time.Time `json:"expires_at"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
 }

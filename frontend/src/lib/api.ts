@@ -275,6 +275,27 @@ class ApiClient {
 			method: 'DELETE',
 		});
 	}
+
+	// User API Keys
+	async listAPIKeys() {
+		return this.request('/api/user/api-keys');
+	}
+
+	async createAPIKey(keyName: string, expiresIn?: number) {
+		return this.request('/api/user/api-keys', {
+			method: 'POST',
+			body: JSON.stringify({
+				key_name: keyName,
+				expires_in: expiresIn
+			}),
+		});
+	}
+
+	async deleteAPIKey(keyId: number) {
+		return this.request(`/api/user/api-keys/${keyId}`, {
+			method: 'DELETE',
+		});
+	}
 }
 
 export const api = new ApiClient(API_BASE_URL);

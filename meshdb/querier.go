@@ -12,35 +12,57 @@ type Querier interface {
 	AssignAdminKeyToNode(ctx context.Context, arg AssignAdminKeyToNodeParams) (NodeAdminKey, error)
 	CheckUserMeshAccess(ctx context.Context, arg CheckUserMeshAccessParams) (string, error)
 	CountAdminKeysByMesh(ctx context.Context, meshID int64) (int64, error)
+	CountMeshChannels(ctx context.Context, meshID int64) (int64, error)
 	CountNodesByMesh(ctx context.Context, meshID int64) (int64, error)
+	CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (UserApiKey, error)
 	CreateAdminKey(ctx context.Context, arg CreateAdminKeyParams) (AdminKey, error)
 	CreateMesh(ctx context.Context, arg CreateMeshParams) (Mesh, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAPIKey(ctx context.Context, id int64) error
 	DeleteAdminKey(ctx context.Context, id int64) error
+	DeleteExpiredAPIKeys(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteMesh(ctx context.Context, id int64) error
+	DeleteMeshChannel(ctx context.Context, arg DeleteMeshChannelParams) error
 	DeleteNode(ctx context.Context, id int64) error
 	DeleteNodeAdminKeyMapping(ctx context.Context, arg DeleteNodeAdminKeyMappingParams) error
 	DeleteSession(ctx context.Context, token string) error
 	DeleteUser(ctx context.Context, id int64) error
 	DeleteUserSessions(ctx context.Context, userID int64) error
+	GetAPIKey(ctx context.Context, id int64) (UserApiKey, error)
+	GetAPIKeyByHash(ctx context.Context, keyHash string) (UserApiKey, error)
 	GetAdminKey(ctx context.Context, id int64) (AdminKey, error)
 	GetCurrentAdminKeysForNode(ctx context.Context, nodeID int64) ([]GetCurrentAdminKeysForNodeRow, error)
 	GetMeshAccess(ctx context.Context, arg GetMeshAccessParams) (MeshAccess, error)
 	GetMeshByID(ctx context.Context, id int64) (Mesh, error)
+	GetMeshChannel(ctx context.Context, arg GetMeshChannelParams) (MeshChannel, error)
+	// Get mesh with all config defaults
+	GetMeshWithDefaults(ctx context.Context, id int64) (GetMeshWithDefaultsRow, error)
 	GetNode(ctx context.Context, id int64) (Node, error)
 	GetNodeByHardwareID(ctx context.Context, arg GetNodeByHardwareIDParams) (Node, error)
+	// Get the effective config for a node (merging mesh defaults with node overrides)
+	// This is a JSON merge operation
+	GetNodeEffectiveConfig(ctx context.Context, id int64) (GetNodeEffectiveConfigRow, error)
+	// Get the primary (channel 0) for a mesh
+	GetPrimaryChannel(ctx context.Context, meshID int64) (MeshChannel, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	GetUserSessions(ctx context.Context, userID int64) ([]Session, error)
 	GrantMeshAccess(ctx context.Context, arg GrantMeshAccessParams) (MeshAccess, error)
+	// Import all 8 channels from device config, replacing existing ones
+	// This should be called within a transaction
+	ImportMeshChannels(ctx context.Context, meshID int64) error
+	// Import or update node configuration from device scan
+	ImportNodeConfig(ctx context.Context, arg ImportNodeConfigParams) (Node, error)
+	ListAPIKeysByUser(ctx context.Context, userID int64) ([]UserApiKey, error)
 	ListAdminKeysByMesh(ctx context.Context, meshID int64) ([]AdminKey, error)
 	ListAdminKeysForNode(ctx context.Context, nodeID int64) ([]ListAdminKeysForNodeRow, error)
 	ListMeshAccessByMesh(ctx context.Context, meshID int64) ([]ListMeshAccessByMeshRow, error)
 	ListMeshAccessByUser(ctx context.Context, userID int64) ([]ListMeshAccessByUserRow, error)
+	ListMeshChannels(ctx context.Context, meshID int64) ([]MeshChannel, error)
 	ListMeshesByOwner(ctx context.Context, ownerID int64) ([]Mesh, error)
 	ListMeshesByUser(ctx context.Context, userID int64) ([]Mesh, error)
 	ListNodesByMesh(ctx context.Context, meshID int64) ([]Node, error)
@@ -49,12 +71,22 @@ type Querier interface {
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	MarkAdminKeyNotCurrent(ctx context.Context, arg MarkAdminKeyNotCurrentParams) error
 	RevokeMeshAccess(ctx context.Context, arg RevokeMeshAccessParams) error
+	UpdateAPIKeyHash(ctx context.Context, arg UpdateAPIKeyHashParams) (UserApiKey, error)
+	UpdateAPIKeyLastUsed(ctx context.Context, id int64) error
 	UpdateMesh(ctx context.Context, arg UpdateMeshParams) (Mesh, error)
 	UpdateMeshAccess(ctx context.Context, arg UpdateMeshAccessParams) (MeshAccess, error)
+	// Update mesh-wide default configuration
+	UpdateMeshConfigDefaults(ctx context.Context, arg UpdateMeshConfigDefaultsParams) (Mesh, error)
+	// Update LoRa-specific configuration for a mesh
+	UpdateMeshLoRaConfig(ctx context.Context, arg UpdateMeshLoRaConfigParams) (Mesh, error)
 	UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, error)
 	UpdateNodeAppliedState(ctx context.Context, arg UpdateNodeAppliedStateParams) (Node, error)
+	// Update node-specific config overrides
+	UpdateNodeConfigOverrides(ctx context.Context, arg UpdateNodeConfigOverridesParams) (Node, error)
 	UpdateNodeStatus(ctx context.Context, arg UpdateNodeStatusParams) (Node, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	// Insert or update a mesh channel
+	UpsertMeshChannel(ctx context.Context, arg UpsertMeshChannelParams) (MeshChannel, error)
 }
 
 var _ Querier = (*Queries)(nil)

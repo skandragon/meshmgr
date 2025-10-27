@@ -68,6 +68,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 	s.mux.HandleFunc("GET /api/auth/me", s.handleMe)
 
+	// API Keys routes (protected)
+	s.mux.HandleFunc("GET /api/user/api-keys", s.withAuth(s.handleListAPIKeys))
+	s.mux.HandleFunc("POST /api/user/api-keys", s.withAuth(s.handleCreateAPIKey))
+	s.mux.HandleFunc("DELETE /api/user/api-keys/{keyID}", s.withAuth(s.handleDeleteAPIKey))
+
 	// LoRa configuration (public)
 	s.mux.HandleFunc("GET /api/lora-config", s.handleGetLoRaConfig)
 
@@ -87,6 +92,7 @@ func (s *Server) setupRoutes() {
 	// Nodes routes (protected)
 	s.mux.HandleFunc("GET /api/meshes/{meshID}/nodes", s.withAuth(s.handleListNodes))
 	s.mux.HandleFunc("POST /api/meshes/{meshID}/nodes", s.withAuth(s.handleCreateNode))
+	s.mux.HandleFunc("POST /api/meshes/{meshID}/nodes/import", s.withAuth(s.handleImportNodeConfig))
 	s.mux.HandleFunc("GET /api/meshes/{meshID}/nodes/{nodeID}", s.withAuth(s.handleGetNode))
 	s.mux.HandleFunc("PUT /api/meshes/{meshID}/nodes/{nodeID}", s.withAuth(s.handleUpdateNode))
 	s.mux.HandleFunc("PATCH /api/meshes/{meshID}/nodes/{nodeID}/status", s.withAuth(s.handleUpdateNodeStatus))

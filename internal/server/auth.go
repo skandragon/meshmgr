@@ -251,7 +251,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, user)
 }
 
-// authMiddleware is a middleware that validates JWT tokens
+// authMiddleware is a middleware that validates JWT tokens or API keys
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get token from Authorization header
@@ -270,24 +270,63 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 
 		token := parts[1]
 
-		// Validate token
+		// Try JWT validation first
 		claims, err := auth.ValidateToken(token, s.config.Auth.JWTSecret)
-		if err != nil {
-			writeError(w, http.StatusUnauthorized, "Invalid token")
+		if err == nil {
+			// JWT is valid, get user
+			user, err := s.DB().GetUserByID(r.Context(), claims.UserID)
+			if err != nil {
+				writeError(w, http.StatusUnauthorized, "User not found")
+				return
+			}
+
+			// Add user to context
+			ctx := context.WithValue(r.Context(), userContextKey, &user)
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
-		// Get user
-		user, err := s.DB().GetUserByID(r.Context(), claims.UserID)
+		// JWT validation failed, try API key
+		user, err := s.validateAPIKey(r.Context(), token)
 		if err != nil {
-			writeError(w, http.StatusUnauthorized, "User not found")
+			writeError(w, http.StatusUnauthorized, "Invalid token or API key")
 			return
 		}
 
 		// Add user to context
-		ctx := context.WithValue(r.Context(), userContextKey, &user)
+		ctx := context.WithValue(r.Context(), userContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// validateAPIKey validates an API key and returns the associated user
+func (s *Server) validateAPIKey(ctx context.Context, key string) (*meshdb.User, error) {
+	// Hash the provided key using SHA256
+	keyHash := auth.HashAPIKey(key)
+
+	// Look up the API key by hash
+	apiKey, err := s.DB().GetAPIKeyByHash(ctx, keyHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if expired
+	if apiKey.ExpiresAt != nil && time.Now().After(*apiKey.ExpiresAt) {
+		return nil, pgx.ErrNoRows
+	}
+
+	// Update last used timestamp (async, ignore errors)
+	go func() {
+		_ = s.DB().UpdateAPIKeyLastUsed(context.Background(), apiKey.ID)
+	}()
+
+	// Get user
+	user, err := s.DB().GetUserByID(ctx, apiKey.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }
 
 // getUserFromContext retrieves the user from the request context
