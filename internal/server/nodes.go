@@ -424,3 +424,150 @@ func (s *Server) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
 		"message": "Node deleted successfully",
 	})
 }
+
+// ImportNodeConfigRequest represents the device config JSON from meshtastic-cli
+type ImportNodeConfigRequest struct {
+	NodeNum          int64           `json:"node_num"`
+	DeviceID         []byte          `json:"device_id"`  // MAC address, base64 encoded in JSON
+	HardwareID       string          `json:"hardware_id"`
+	LongName         string          `json:"long_name"`
+	ShortName        string          `json:"short_name"`
+	Metadata         json.RawMessage `json:"metadata,omitempty"`
+	Config           json.RawMessage `json:"config,omitempty"`
+	ModuleConfig     json.RawMessage `json:"module_config,omitempty"`
+	Channels         json.RawMessage `json:"channels,omitempty"`
+	ConfigComplete   bool            `json:"config_complete"`
+}
+
+// handleImportNodeConfig handles importing configuration from a device scan
+func (s *Server) handleImportNodeConfig(w http.ResponseWriter, r *http.Request) {
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	meshIDStr := r.PathValue("meshID")
+	meshID, err := strconv.ParseInt(meshIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid mesh ID")
+		return
+	}
+
+	// Check if user has at least admin access (required for config import)
+	if _, err := s.requireMeshAccess(r.Context(), user.ID, meshID, AccessLevelAdmin); err != nil {
+		if err == pgx.ErrNoRows {
+			writeError(w, http.StatusNotFound, "Mesh not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to check permissions")
+		return
+	}
+
+	var req ImportNodeConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate required fields
+	if req.HardwareID == "" {
+		writeError(w, http.StatusBadRequest, "hardware_id is required")
+		return
+	}
+	if req.LongName == "" {
+		writeError(w, http.StatusBadRequest, "long_name is required")
+		return
+	}
+
+	// Build the raw_device_config JSON
+	rawConfig := map[string]interface{}{
+		"node_num":        req.NodeNum,
+		"device_id":       req.DeviceID,
+		"hardware_id":     req.HardwareID,
+		"long_name":       req.LongName,
+		"short_name":      req.ShortName,
+		"metadata":        req.Metadata,
+		"config":          req.Config,
+		"module_config":   req.ModuleConfig,
+		"channels":        req.Channels,
+		"config_complete": req.ConfigComplete,
+	}
+	rawConfigJSON, err := json.Marshal(rawConfig)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to serialize config")
+		return
+	}
+
+	// Extract security keys if present
+	var publicKey, privateKey *string
+	if req.Config != nil {
+		var configData map[string]interface{}
+		if err := json.Unmarshal(req.Config, &configData); err == nil {
+			if security, ok := configData["security"].(map[string]interface{}); ok {
+				if pk, ok := security["public_key"].(string); ok && pk != "" {
+					publicKey = &pk
+				}
+				if prk, ok := security["private_key"].(string); ok && prk != "" {
+					privateKey = &prk
+				}
+			}
+		}
+	}
+
+	// Extract firmware version and hw_model from metadata
+	var firmwareVersion *string
+	var hwModel *int32
+	if req.Metadata != nil {
+		var metadataObj map[string]interface{}
+		if err := json.Unmarshal(req.Metadata, &metadataObj); err == nil {
+			if fv, ok := metadataObj["firmware_version"].(string); ok && fv != "" {
+				firmwareVersion = &fv
+			}
+			if hm, ok := metadataObj["hw_model"].(float64); ok {
+				hwModelInt := int32(hm)
+				hwModel = &hwModelInt
+			}
+		}
+	}
+
+	// Prepare NodeNum as *int64
+	var nodeNum *int64
+	if req.NodeNum != 0 {
+		nodeNum = &req.NodeNum
+	}
+
+	// Prepare ShortName as *string
+	var shortName *string
+	if req.ShortName != "" {
+		shortName = &req.ShortName
+	}
+
+	// Prepare hw_model
+	var hwModelValue pgtype.Int4
+	if hwModel != nil {
+		hwModelValue = pgtype.Int4{Int32: *hwModel, Valid: true}
+	}
+
+	// Import the node config (upsert)
+	node, err := s.DB().ImportNodeConfig(r.Context(), meshdb.ImportNodeConfigParams{
+		MeshID:          meshID,
+		HardwareID:      req.HardwareID,
+		NodeNum:         nodeNum,
+		DeviceID:        req.DeviceID,
+		Name:            req.ShortName, // Use short_name as the default name
+		LongName:        req.LongName,
+		ShortName:       shortName,
+		FirmwareVersion: firmwareVersion,
+		HwModel:         hwModelValue,
+		PublicKey:       publicKey,
+		PrivateKey:      privateKey,
+		RawDeviceConfig: rawConfigJSON,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to import node config")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, node)
+}

@@ -29,7 +29,7 @@ RETURNING id, mesh_id, public_key, key_name, added_by, created_at
 
 type CreateAdminKeyParams struct {
 	MeshID    int64   `json:"mesh_id"`
-	PublicKey string  `json:"public_key"`
+	PublicKey []byte  `json:"public_key"`
 	KeyName   *string `json:"key_name"`
 	AddedBy   int64   `json:"added_by"`
 }

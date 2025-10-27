@@ -7,6 +7,7 @@ package meshdb
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -14,7 +15,7 @@ import (
 const createMesh = `-- name: CreateMesh :one
 INSERT INTO meshes (owner_id, name, description, lora_region, modem_preset, frequency_slot)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot
+RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot, hop_limit, tx_power, channel_num, use_preset, config_defaults
 `
 
 type CreateMeshParams struct {
@@ -46,6 +47,11 @@ func (q *Queries) CreateMesh(ctx context.Context, arg CreateMeshParams) (Mesh, e
 		&i.LoraRegion,
 		&i.ModemPreset,
 		&i.FrequencySlot,
+		&i.HopLimit,
+		&i.TxPower,
+		&i.ChannelNum,
+		&i.UsePreset,
+		&i.ConfigDefaults,
 	)
 	return i, err
 }
@@ -61,7 +67,7 @@ func (q *Queries) DeleteMesh(ctx context.Context, id int64) error {
 }
 
 const getMeshByID = `-- name: GetMeshByID :one
-SELECT id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot FROM meshes
+SELECT id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot, hop_limit, tx_power, channel_num, use_preset, config_defaults FROM meshes
 WHERE id = $1
 `
 
@@ -78,12 +84,77 @@ func (q *Queries) GetMeshByID(ctx context.Context, id int64) (Mesh, error) {
 		&i.LoraRegion,
 		&i.ModemPreset,
 		&i.FrequencySlot,
+		&i.HopLimit,
+		&i.TxPower,
+		&i.ChannelNum,
+		&i.UsePreset,
+		&i.ConfigDefaults,
+	)
+	return i, err
+}
+
+const getMeshWithDefaults = `-- name: GetMeshWithDefaults :one
+SELECT
+    id,
+    owner_id,
+    name,
+    description,
+    lora_region,
+    modem_preset,
+    frequency_slot,
+    hop_limit,
+    tx_power,
+    channel_num,
+    use_preset,
+    config_defaults,
+    created_at,
+    updated_at
+FROM meshes
+WHERE id = $1
+`
+
+type GetMeshWithDefaultsRow struct {
+	ID             int64       `json:"id"`
+	OwnerID        int64       `json:"owner_id"`
+	Name           string      `json:"name"`
+	Description    *string     `json:"description"`
+	LoraRegion     *string     `json:"lora_region"`
+	ModemPreset    *string     `json:"modem_preset"`
+	FrequencySlot  pgtype.Int4 `json:"frequency_slot"`
+	HopLimit       pgtype.Int4 `json:"hop_limit"`
+	TxPower        pgtype.Int4 `json:"tx_power"`
+	ChannelNum     pgtype.Int4 `json:"channel_num"`
+	UsePreset      bool        `json:"use_preset"`
+	ConfigDefaults []byte      `json:"config_defaults"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+}
+
+// Get mesh with all config defaults
+func (q *Queries) GetMeshWithDefaults(ctx context.Context, id int64) (GetMeshWithDefaultsRow, error) {
+	row := q.db.QueryRow(ctx, getMeshWithDefaults, id)
+	var i GetMeshWithDefaultsRow
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.Description,
+		&i.LoraRegion,
+		&i.ModemPreset,
+		&i.FrequencySlot,
+		&i.HopLimit,
+		&i.TxPower,
+		&i.ChannelNum,
+		&i.UsePreset,
+		&i.ConfigDefaults,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listMeshesByOwner = `-- name: ListMeshesByOwner :many
-SELECT id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot FROM meshes
+SELECT id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot, hop_limit, tx_power, channel_num, use_preset, config_defaults FROM meshes
 WHERE owner_id = $1
 ORDER BY created_at DESC
 `
@@ -107,6 +178,11 @@ func (q *Queries) ListMeshesByOwner(ctx context.Context, ownerID int64) ([]Mesh,
 			&i.LoraRegion,
 			&i.ModemPreset,
 			&i.FrequencySlot,
+			&i.HopLimit,
+			&i.TxPower,
+			&i.ChannelNum,
+			&i.UsePreset,
+			&i.ConfigDefaults,
 		); err != nil {
 			return nil, err
 		}
@@ -119,7 +195,7 @@ func (q *Queries) ListMeshesByOwner(ctx context.Context, ownerID int64) ([]Mesh,
 }
 
 const listMeshesByUser = `-- name: ListMeshesByUser :many
-SELECT DISTINCT m.id, m.owner_id, m.name, m.description, m.created_at, m.updated_at, m.lora_region, m.modem_preset, m.frequency_slot FROM meshes m
+SELECT DISTINCT m.id, m.owner_id, m.name, m.description, m.created_at, m.updated_at, m.lora_region, m.modem_preset, m.frequency_slot, m.hop_limit, m.tx_power, m.channel_num, m.use_preset, m.config_defaults FROM meshes m
 LEFT JOIN mesh_access ma ON m.id = ma.mesh_id
 WHERE m.owner_id = $1 OR ma.user_id = $1
 ORDER BY m.created_at DESC
@@ -144,6 +220,11 @@ func (q *Queries) ListMeshesByUser(ctx context.Context, userID int64) ([]Mesh, e
 			&i.LoraRegion,
 			&i.ModemPreset,
 			&i.FrequencySlot,
+			&i.HopLimit,
+			&i.TxPower,
+			&i.ChannelNum,
+			&i.UsePreset,
+			&i.ConfigDefaults,
 		); err != nil {
 			return nil, err
 		}
@@ -165,7 +246,7 @@ SET
     frequency_slot = COALESCE($5, frequency_slot),
     updated_at = NOW()
 WHERE id = $6
-RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot
+RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot, hop_limit, tx_power, channel_num, use_preset, config_defaults
 `
 
 type UpdateMeshParams struct {
@@ -197,6 +278,106 @@ func (q *Queries) UpdateMesh(ctx context.Context, arg UpdateMeshParams) (Mesh, e
 		&i.LoraRegion,
 		&i.ModemPreset,
 		&i.FrequencySlot,
+		&i.HopLimit,
+		&i.TxPower,
+		&i.ChannelNum,
+		&i.UsePreset,
+		&i.ConfigDefaults,
+	)
+	return i, err
+}
+
+const updateMeshConfigDefaults = `-- name: UpdateMeshConfigDefaults :one
+UPDATE meshes
+SET
+    config_defaults = $1,
+    updated_at = NOW()
+WHERE id = $2
+RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot, hop_limit, tx_power, channel_num, use_preset, config_defaults
+`
+
+type UpdateMeshConfigDefaultsParams struct {
+	ConfigDefaults []byte `json:"config_defaults"`
+	ID             int64  `json:"id"`
+}
+
+// Update mesh-wide default configuration
+func (q *Queries) UpdateMeshConfigDefaults(ctx context.Context, arg UpdateMeshConfigDefaultsParams) (Mesh, error) {
+	row := q.db.QueryRow(ctx, updateMeshConfigDefaults, arg.ConfigDefaults, arg.ID)
+	var i Mesh
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LoraRegion,
+		&i.ModemPreset,
+		&i.FrequencySlot,
+		&i.HopLimit,
+		&i.TxPower,
+		&i.ChannelNum,
+		&i.UsePreset,
+		&i.ConfigDefaults,
+	)
+	return i, err
+}
+
+const updateMeshLoRaConfig = `-- name: UpdateMeshLoRaConfig :one
+UPDATE meshes
+SET
+    lora_region = COALESCE($1, lora_region),
+    modem_preset = COALESCE($2, modem_preset),
+    frequency_slot = COALESCE($3, frequency_slot),
+    hop_limit = COALESCE($4, hop_limit),
+    tx_power = COALESCE($5, tx_power),
+    channel_num = COALESCE($6, channel_num),
+    use_preset = COALESCE($7, use_preset),
+    updated_at = NOW()
+WHERE id = $8
+RETURNING id, owner_id, name, description, created_at, updated_at, lora_region, modem_preset, frequency_slot, hop_limit, tx_power, channel_num, use_preset, config_defaults
+`
+
+type UpdateMeshLoRaConfigParams struct {
+	LoraRegion    *string     `json:"lora_region"`
+	ModemPreset   *string     `json:"modem_preset"`
+	FrequencySlot pgtype.Int4 `json:"frequency_slot"`
+	HopLimit      pgtype.Int4 `json:"hop_limit"`
+	TxPower       pgtype.Int4 `json:"tx_power"`
+	ChannelNum    pgtype.Int4 `json:"channel_num"`
+	UsePreset     pgtype.Bool `json:"use_preset"`
+	ID            int64       `json:"id"`
+}
+
+// Update LoRa-specific configuration for a mesh
+func (q *Queries) UpdateMeshLoRaConfig(ctx context.Context, arg UpdateMeshLoRaConfigParams) (Mesh, error) {
+	row := q.db.QueryRow(ctx, updateMeshLoRaConfig,
+		arg.LoraRegion,
+		arg.ModemPreset,
+		arg.FrequencySlot,
+		arg.HopLimit,
+		arg.TxPower,
+		arg.ChannelNum,
+		arg.UsePreset,
+		arg.ID,
+	)
+	var i Mesh
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LoraRegion,
+		&i.ModemPreset,
+		&i.FrequencySlot,
+		&i.HopLimit,
+		&i.TxPower,
+		&i.ChannelNum,
+		&i.UsePreset,
+		&i.ConfigDefaults,
 	)
 	return i, err
 }

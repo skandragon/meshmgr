@@ -66,7 +66,7 @@ type GetCurrentAdminKeysForNodeRow struct {
 	AppliedAt  time.Time `json:"applied_at"`
 	IsCurrent  bool      `json:"is_current"`
 	KeyName    *string   `json:"key_name"`
-	PublicKey  string    `json:"public_key"`
+	PublicKey  []byte    `json:"public_key"`
 }
 
 func (q *Queries) GetCurrentAdminKeysForNode(ctx context.Context, nodeID int64) ([]GetCurrentAdminKeysForNodeRow, error) {
@@ -112,7 +112,7 @@ type ListAdminKeysForNodeRow struct {
 	AppliedAt  time.Time `json:"applied_at"`
 	IsCurrent  bool      `json:"is_current"`
 	KeyName    *string   `json:"key_name"`
-	PublicKey  string    `json:"public_key"`
+	PublicKey  []byte    `json:"public_key"`
 }
 
 func (q *Queries) ListAdminKeysForNode(ctx context.Context, nodeID int64) ([]ListAdminKeysForNodeRow, error) {

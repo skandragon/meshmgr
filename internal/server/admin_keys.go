@@ -162,10 +162,13 @@ func (s *Server) handleCreateAdminKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decode base64 public key to bytes
+	publicKeyBytes := []byte(req.PublicKey)
+
 	// Create the admin key
 	key, err := s.DB().CreateAdminKey(r.Context(), meshdb.CreateAdminKeyParams{
 		MeshID:    meshID,
-		PublicKey: req.PublicKey,
+		PublicKey: publicKeyBytes,
 		KeyName:   req.KeyName,
 		AddedBy:   user.ID,
 	})

@@ -124,6 +124,8 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 		"1760605929_add_node_admin_keys_mapping.up.sql",
 		"1760631305_update_preset_names.up.sql",
 		"1760632000_update_frequency_slot_range.up.sql",
+		"1760640000_add_device_config_storage.up.sql",
+		"1760650000_add_api_keys.up.sql",
 	}
 
 	for _, migration := range migrations {

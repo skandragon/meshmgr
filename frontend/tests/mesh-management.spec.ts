@@ -149,39 +149,35 @@ test.describe('Mesh Management', () => {
 		await createMesh(page, 'Keys Test Mesh');
 		await page.getByText('Keys Test Mesh').first().click();
 
+		// Navigate to edit page
+		await page.getByRole('link', { name: 'Edit Mesh' }).click();
+
 		// Switch to Admin Keys tab
 		await page.getByRole('button', { name: 'Admin Keys' }).click();
-		await expect(page.getByText('No admin keys yet.')).toBeVisible({ timeout: 10000 });
+		await expect(page.getByText('Configure up to 3 admin keys')).toBeVisible({ timeout: 10000 });
 
-		// Add first key
-		await page.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByRole('heading', { name: 'Add Admin Key' })).toBeVisible();
-		let modal = page.locator('div.fixed').filter({ hasText: 'Add Admin Key' });
-		await modal.locator('textarea').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...');
-		await modal.locator('label:has-text("Key Name") + input').fill('Key 1');
-		await modal.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByText('Key 1')).toBeVisible({ timeout: 10000 });
+		// Add first key (Primary)
+		await page.locator('#key-name-0').fill('Primary Admin Key');
+		await page.locator('#key-value-0').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...');
+		await page.getByRole('button', { name: 'Save' }).first().click();
+		await expect(page.locator('#key-name-0')).toHaveValue('Primary Admin Key', { timeout: 10000 });
 
-		// Add second key
-		await page.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByRole('heading', { name: 'Add Admin Key' })).toBeVisible();
-		modal = page.locator('div.fixed').filter({ hasText: 'Add Admin Key' });
-		await modal.locator('textarea').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD...');
-		await modal.locator('label:has-text("Key Name") + input').fill('Key 2');
-		await modal.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByText('Key 2')).toBeVisible({ timeout: 10000 });
+		// Add second key (Secondary)
+		await page.locator('#key-name-1').fill('Secondary Admin Key');
+		await page.locator('#key-value-1').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD...');
+		await page.getByRole('button', { name: 'Save' }).nth(1).click();
+		await expect(page.locator('#key-name-1')).toHaveValue('Secondary Admin Key', { timeout: 10000 });
 
-		// Add third key
-		await page.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByRole('heading', { name: 'Add Admin Key' })).toBeVisible();
-		modal = page.locator('div.fixed').filter({ hasText: 'Add Admin Key' });
-		await modal.locator('textarea').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQE...');
-		await modal.locator('label:has-text("Key Name") + input').fill('Key 3');
-		await modal.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByText('Key 3')).toBeVisible({ timeout: 10000 });
+		// Add third key (Tertiary)
+		await page.locator('#key-name-2').fill('Tertiary Admin Key');
+		await page.locator('#key-value-2').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQE...');
+		await page.getByRole('button', { name: 'Save' }).nth(2).click();
+		await expect(page.locator('#key-name-2')).toHaveValue('Tertiary Admin Key', { timeout: 10000 });
 
-		// Verify "Add Key" button is disabled (max 3 keys)
-		await expect(page.getByRole('button', { name: 'Add Key' })).toBeDisabled();
+		// Verify all three keys are filled
+		await expect(page.locator('#key-value-0')).not.toHaveValue('');
+		await expect(page.locator('#key-value-1')).not.toHaveValue('');
+		await expect(page.locator('#key-value-2')).not.toHaveValue('');
 	});
 
 	test('should delete an admin key', async ({ page }) => {
@@ -189,25 +185,27 @@ test.describe('Mesh Management', () => {
 		await createMesh(page, 'Delete Key Mesh');
 		await page.getByText('Delete Key Mesh').first().click();
 
+		// Navigate to edit page
+		await page.getByRole('link', { name: 'Edit Mesh' }).click();
+
 		// Switch to Admin Keys tab
 		await page.getByRole('button', { name: 'Admin Keys' }).click();
+		await expect(page.getByText('Configure up to 3 admin keys')).toBeVisible({ timeout: 10000 });
 
-		// Add a key
-		await page.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByRole('heading', { name: 'Add Admin Key' })).toBeVisible();
-		const modal = page.locator('div.fixed').filter({ hasText: 'Add Admin Key' });
-		await modal.locator('textarea').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQF...');
-		await modal.locator('label:has-text("Key Name") + input').fill('To Delete');
-		await modal.getByRole('button', { name: 'Add Key' }).click();
-		await expect(page.getByText('To Delete')).toBeVisible({ timeout: 10000 });
+		// Add a key to the first slot
+		await page.locator('#key-name-0').fill('Test Key');
+		await page.locator('#key-value-0').fill('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQF...');
+		await page.getByRole('button', { name: 'Save' }).first().click();
+		await expect(page.locator('#key-name-0')).toHaveValue('Test Key', { timeout: 10000 });
 
-		// Delete the key
-		page.on('dialog', dialog => dialog.accept());
-		await page.getByRole('button', { name: 'Delete' }).first().click();
+		// Delete the key by clearing it and saving
+		await page.locator('#key-name-0').clear();
+		await page.locator('#key-value-0').clear();
+		await page.getByRole('button', { name: 'Save' }).first().click();
 
-		// Verify key is gone
-		await expect(page.getByText('No admin keys yet.')).toBeVisible({ timeout: 10000 });
-		await expect(page.getByRole('button', { name: 'Add Key' })).not.toBeDisabled();
+		// Verify key is cleared
+		await expect(page.locator('#key-name-0')).toHaveValue('', { timeout: 10000 });
+		await expect(page.locator('#key-value-0')).toHaveValue('');
 	});
 
 	test('should create mesh with LoRa configuration', async ({ page }) => {

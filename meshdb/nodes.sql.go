@@ -27,7 +27,7 @@ func (q *Queries) CountNodesByMesh(ctx context.Context, meshID int64) (int64, er
 const createNode = `-- name: CreateNode :one
 INSERT INTO nodes (mesh_id, hardware_id, name, long_name, role, public_key, private_key, status, unmessageable)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at
 `
 
 type CreateNodeParams struct {
@@ -77,6 +77,14 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.Unmessageable,
 		&i.ConfigAppliedAt,
 		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
 	)
 	return i, err
 }
@@ -92,7 +100,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id int64) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at FROM nodes
 WHERE id = $1
 `
 
@@ -121,12 +129,20 @@ func (q *Queries) GetNode(ctx context.Context, id int64) (Node, error) {
 		&i.Unmessageable,
 		&i.ConfigAppliedAt,
 		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
 	)
 	return i, err
 }
 
 const getNodeByHardwareID = `-- name: GetNodeByHardwareID :one
-SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at FROM nodes
 WHERE mesh_id = $1 AND hardware_id = $2
 `
 
@@ -160,12 +176,194 @@ func (q *Queries) GetNodeByHardwareID(ctx context.Context, arg GetNodeByHardware
 		&i.Unmessageable,
 		&i.ConfigAppliedAt,
 		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
+	)
+	return i, err
+}
+
+const getNodeEffectiveConfig = `-- name: GetNodeEffectiveConfig :one
+SELECT
+    n.id,
+    n.hardware_id,
+    n.node_num,
+    n.device_id,
+    n.name,
+    n.long_name,
+    n.short_name,
+    m.config_defaults || n.config_overrides as effective_config,
+    n.raw_device_config,
+    n.config_imported_at,
+    n.config_applied_at,
+    n.pending_changes
+FROM nodes n
+JOIN meshes m ON n.mesh_id = m.id
+WHERE n.id = $1
+`
+
+type GetNodeEffectiveConfigRow struct {
+	ID               int64       `json:"id"`
+	HardwareID       string      `json:"hardware_id"`
+	NodeNum          *int64      `json:"node_num"`
+	DeviceID         []byte      `json:"device_id"`
+	Name             string      `json:"name"`
+	LongName         string      `json:"long_name"`
+	ShortName        *string     `json:"short_name"`
+	EffectiveConfig  interface{} `json:"effective_config"`
+	RawDeviceConfig  []byte      `json:"raw_device_config"`
+	ConfigImportedAt *time.Time  `json:"config_imported_at"`
+	ConfigAppliedAt  *time.Time  `json:"config_applied_at"`
+	PendingChanges   bool        `json:"pending_changes"`
+}
+
+// Get the effective config for a node (merging mesh defaults with node overrides)
+// This is a JSON merge operation
+func (q *Queries) GetNodeEffectiveConfig(ctx context.Context, id int64) (GetNodeEffectiveConfigRow, error) {
+	row := q.db.QueryRow(ctx, getNodeEffectiveConfig, id)
+	var i GetNodeEffectiveConfigRow
+	err := row.Scan(
+		&i.ID,
+		&i.HardwareID,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.Name,
+		&i.LongName,
+		&i.ShortName,
+		&i.EffectiveConfig,
+		&i.RawDeviceConfig,
+		&i.ConfigImportedAt,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
+	)
+	return i, err
+}
+
+const importNodeConfig = `-- name: ImportNodeConfig :one
+INSERT INTO nodes (
+    mesh_id,
+    hardware_id,
+    node_num,
+    device_id,
+    name,
+    long_name,
+    short_name,
+    firmware_version,
+    hw_model,
+    public_key,
+    private_key,
+    raw_device_config,
+    config_imported_at,
+    last_seen,
+    status
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    NOW(),
+    NOW(),
+    'online'
+)
+ON CONFLICT (mesh_id, hardware_id)
+DO UPDATE SET
+    node_num = EXCLUDED.node_num,
+    device_id = EXCLUDED.device_id,
+    long_name = EXCLUDED.long_name,
+    short_name = EXCLUDED.short_name,
+    firmware_version = EXCLUDED.firmware_version,
+    hw_model = EXCLUDED.hw_model,
+    public_key = EXCLUDED.public_key,
+    private_key = EXCLUDED.private_key,
+    raw_device_config = EXCLUDED.raw_device_config,
+    config_imported_at = NOW(),
+    last_seen = NOW(),
+    status = 'online',
+    updated_at = NOW()
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at
+`
+
+type ImportNodeConfigParams struct {
+	MeshID          int64       `json:"mesh_id"`
+	HardwareID      string      `json:"hardware_id"`
+	NodeNum         *int64      `json:"node_num"`
+	DeviceID        []byte      `json:"device_id"`
+	Name            string      `json:"name"`
+	LongName        string      `json:"long_name"`
+	ShortName       *string     `json:"short_name"`
+	FirmwareVersion *string     `json:"firmware_version"`
+	HwModel         pgtype.Int4 `json:"hw_model"`
+	PublicKey       *string     `json:"public_key"`
+	PrivateKey      *string     `json:"private_key"`
+	RawDeviceConfig []byte      `json:"raw_device_config"`
+}
+
+// Import or update node configuration from device scan
+func (q *Queries) ImportNodeConfig(ctx context.Context, arg ImportNodeConfigParams) (Node, error) {
+	row := q.db.QueryRow(ctx, importNodeConfig,
+		arg.MeshID,
+		arg.HardwareID,
+		arg.NodeNum,
+		arg.DeviceID,
+		arg.Name,
+		arg.LongName,
+		arg.ShortName,
+		arg.FirmwareVersion,
+		arg.HwModel,
+		arg.PublicKey,
+		arg.PrivateKey,
+		arg.RawDeviceConfig,
+	)
+	var i Node
+	err := row.Scan(
+		&i.ID,
+		&i.MeshID,
+		&i.HardwareID,
+		&i.Name,
+		&i.LongName,
+		&i.Role,
+		&i.PublicKey,
+		&i.PrivateKey,
+		&i.LastSeen,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
 	)
 	return i, err
 }
 
 const listNodesByMesh = `-- name: ListNodesByMesh :many
-SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at FROM nodes
 WHERE mesh_id = $1
 ORDER BY name ASC
 `
@@ -201,6 +399,14 @@ func (q *Queries) ListNodesByMesh(ctx context.Context, meshID int64) ([]Node, er
 			&i.Unmessageable,
 			&i.ConfigAppliedAt,
 			&i.PendingChanges,
+			&i.NodeNum,
+			&i.DeviceID,
+			&i.FirmwareVersion,
+			&i.HwModel,
+			&i.ShortName,
+			&i.RawDeviceConfig,
+			&i.ConfigOverrides,
+			&i.ConfigImportedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -213,7 +419,7 @@ func (q *Queries) ListNodesByMesh(ctx context.Context, meshID int64) ([]Node, er
 }
 
 const listNodesWithPendingChanges = `-- name: ListNodesWithPendingChanges :many
-SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes FROM nodes
+SELECT id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at FROM nodes
 WHERE mesh_id = $1 AND pending_changes = TRUE
 ORDER BY name ASC
 `
@@ -249,6 +455,14 @@ func (q *Queries) ListNodesWithPendingChanges(ctx context.Context, meshID int64)
 			&i.Unmessageable,
 			&i.ConfigAppliedAt,
 			&i.PendingChanges,
+			&i.NodeNum,
+			&i.DeviceID,
+			&i.FirmwareVersion,
+			&i.HwModel,
+			&i.ShortName,
+			&i.RawDeviceConfig,
+			&i.ConfigOverrides,
+			&i.ConfigImportedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -274,7 +488,7 @@ SET
     pending_changes = COALESCE($9, pending_changes),
     updated_at = NOW()
 WHERE id = $10
-RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at
 `
 
 type UpdateNodeParams struct {
@@ -326,6 +540,14 @@ func (q *Queries) UpdateNode(ctx context.Context, arg UpdateNodeParams) (Node, e
 		&i.Unmessageable,
 		&i.ConfigAppliedAt,
 		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
 	)
 	return i, err
 }
@@ -343,7 +565,7 @@ SET
     pending_changes = FALSE,
     updated_at = NOW()
 WHERE id = $7
-RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at
 `
 
 type UpdateNodeAppliedStateParams struct {
@@ -389,6 +611,67 @@ func (q *Queries) UpdateNodeAppliedState(ctx context.Context, arg UpdateNodeAppl
 		&i.Unmessageable,
 		&i.ConfigAppliedAt,
 		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
+	)
+	return i, err
+}
+
+const updateNodeConfigOverrides = `-- name: UpdateNodeConfigOverrides :one
+UPDATE nodes
+SET
+    config_overrides = $1,
+    pending_changes = TRUE,
+    updated_at = NOW()
+WHERE id = $2
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at
+`
+
+type UpdateNodeConfigOverridesParams struct {
+	ConfigOverrides []byte `json:"config_overrides"`
+	ID              int64  `json:"id"`
+}
+
+// Update node-specific config overrides
+func (q *Queries) UpdateNodeConfigOverrides(ctx context.Context, arg UpdateNodeConfigOverridesParams) (Node, error) {
+	row := q.db.QueryRow(ctx, updateNodeConfigOverrides, arg.ConfigOverrides, arg.ID)
+	var i Node
+	err := row.Scan(
+		&i.ID,
+		&i.MeshID,
+		&i.HardwareID,
+		&i.Name,
+		&i.LongName,
+		&i.Role,
+		&i.PublicKey,
+		&i.PrivateKey,
+		&i.LastSeen,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AppliedName,
+		&i.AppliedLongName,
+		&i.AppliedRole,
+		&i.AppliedPublicKey,
+		&i.AppliedPrivateKey,
+		&i.AppliedUnmessageable,
+		&i.Unmessageable,
+		&i.ConfigAppliedAt,
+		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
 	)
 	return i, err
 }
@@ -400,7 +683,7 @@ SET
     last_seen = NOW(),
     updated_at = NOW()
 WHERE id = $2
-RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes
+RETURNING id, mesh_id, hardware_id, name, long_name, role, public_key, private_key, last_seen, status, created_at, updated_at, applied_name, applied_long_name, applied_role, applied_public_key, applied_private_key, applied_unmessageable, unmessageable, config_applied_at, pending_changes, node_num, device_id, firmware_version, hw_model, short_name, raw_device_config, config_overrides, config_imported_at
 `
 
 type UpdateNodeStatusParams struct {
@@ -433,6 +716,14 @@ func (q *Queries) UpdateNodeStatus(ctx context.Context, arg UpdateNodeStatusPara
 		&i.Unmessageable,
 		&i.ConfigAppliedAt,
 		&i.PendingChanges,
+		&i.NodeNum,
+		&i.DeviceID,
+		&i.FirmwareVersion,
+		&i.HwModel,
+		&i.ShortName,
+		&i.RawDeviceConfig,
+		&i.ConfigOverrides,
+		&i.ConfigImportedAt,
 	)
 	return i, err
 }
